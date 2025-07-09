@@ -1,0 +1,86 @@
+{
+  "name": "arcade-platform-frontend",
+  "version": "1.0.0",
+  "description": "经典街机游戏平台前端应用",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@hookform/resolvers": "^3.3.2",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.19",
+    "@reduxjs/toolkit": "^2.0.1",
+    "axios": "^1.6.2",
+    "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
+    "framer-motion": "^10.16.16",
+    "js-cookie": "^3.0.5",
+    "lodash": "^4.17.21",
+    "lottie-react": "^2.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-helmet-async": "^1.3.0",
+    "react-hook-form": "^7.48.2",
+    "react-hot-toast": "^2.4.1",
+    "react-lazy-load-image-component": "^1.6.0",
+    "react-query": "^3.39.3",
+    "react-redux": "^9.0.4",
+    "react-refresh": "^0.17.0",
+    "react-router-dom": "^6.20.1",
+    "react-use": "^17.4.0",
+    "redux-persist": "^6.0.0",
+    "socket.io-client": "^4.7.4",
+    "swiper": "^11.0.5",
+    "yup": "^1.3.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "analyze": "npm run build && npx bundle-analyzer build/static/js/*.js",
+    "lint": "eslint src/**/*.{js,jsx,ts,tsx}",
+    "lint:fix": "eslint src/**/*.{js,jsx,ts,tsx} --fix",
+    "format": "prettier --write src/**/*.{js,jsx,ts,tsx,css,scss,json}",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@storybook/addon-essentials": "^7.5.3",
+    "@storybook/addon-interactions": "^7.5.3",
+    "@storybook/addon-links": "^7.5.3",
+    "@storybook/blocks": "^7.5.3",
+    "@storybook/preset-create-react-app": "^7.5.3",
+    "@storybook/react": "^7.5.3",
+    "@storybook/react-webpack5": "^7.5.3",
+    "@storybook/testing-library": "^0.2.2",
+    "@types/js-cookie": "^3.0.6",
+    "@types/lodash": "^4.14.202",
+    "@types/node": "^20.9.2",
+    "@types/react": "^18.2.39",
+    "@types/react-dom": "^18.2.17",
+    "eslint": "^8.54.0",
+    "eslint-config-react-app": "^7.0.1",
+    "prettier": "^3.1.0",
+    "react-scripts": "^5.0.1",
+    "storybook": "^7.5.3",
+    "typescript": "^4.9.5"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "proxy": "http://localhost:5000",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

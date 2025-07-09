@@ -1,0 +1,53 @@
+{
+  "name": "classic-arcade-platform",
+  "version": "1.0.0",
+  "description": "经典街机游戏平台 - 怀旧游戏在线对战平台",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm start",
+    "backend:install": "cd backend && npm install",
+    "frontend:install": "cd frontend && npm install",
+    "install:all": "npm install && npm run backend:install && npm run frontend:install",
+    "build": "cd frontend && npm run build",
+    "test": "npm run backend:test && npm run frontend:test",
+    "backend:test": "cd backend && npm test",
+    "frontend:test": "cd frontend && npm test",
+    "docker:dev": "docker-compose up -d",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "docker:down": "docker-compose down",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed"
+  },
+  "keywords": [
+    "arcade",
+    "classic-games",
+    "multiplayer",
+    "gaming-platform",
+    "nostalgia",
+    "street-fighter",
+    "retro-games"
+  ],
+  "author": "经典游戏平台开发团队",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/classic-arcade-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/classic-arcade-platform/issues"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.0",
+    "react-redux": "^9.2.0"
+  },
+  "homepage": "https://github.com/your-username/classic-arcade-platform#readme"
+} 
