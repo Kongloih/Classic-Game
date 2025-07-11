@@ -268,6 +268,10 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     setLevel(1);
     setLines(0);
     setGameBoard(createEmptyBoard());
+    
+    // 注册全局暂停/继续回调
+    window.gamePauseCallback = () => setGameStatus('paused');
+    window.gameResumeCallback = () => setGameStatus('playing');
   };
 
   // 重新开始游戏

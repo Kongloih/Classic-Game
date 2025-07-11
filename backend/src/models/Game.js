@@ -10,192 +10,172 @@ const Game = sequelize.define('Game', {
   name: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    validate: {
-      len: [1, 100]
-    }
+    comment: '游戏名称'
   },
   name_en: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    comment: '英文名称'
   },
   name_jp: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    comment: '日文名称'
   },
   description: {
     type: DataTypes.TEXT,
-    allowNull: true
+    allowNull: true,
+    comment: '游戏描述'
   },
   category: {
-    type: DataTypes.ENUM(
-      'fighting',     // 格斗类
-      'action',       // 动作类
-      'shooting',     // 射击类
-      'puzzle',       // 益智类
-      'racing',       // 赛车类
-      'sports',       // 体育类
-      'platform',     // 平台跳跃类
-      'arcade',       // 街机类
-      'strategy',     // 策略类
-      'rpg'          // 角色扮演类
-    ),
-    allowNull: false
+    type: DataTypes.ENUM('fighting', 'action', 'shooting', 'puzzle', 'racing', 'sports', 'platform', 'arcade', 'strategy', 'rpg'),
+    allowNull: false,
+    comment: '游戏分类'
   },
   developer: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    comment: '开发商'
   },
   publisher: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    comment: '发行商'
   },
   release_year: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    validate: {
-      min: 1970,
-      max: new Date().getFullYear()
-    }
+    comment: '发行年份'
   },
-  // 游戏资源
   thumbnail: {
     type: DataTypes.STRING(255),
-    allowNull: true
+    allowNull: true,
+    comment: '缩略图'
   },
   cover_image: {
     type: DataTypes.STRING(255),
-    allowNull: true
+    allowNull: true,
+    comment: '封面图'
   },
   screenshots: {
     type: DataTypes.JSON,
-    defaultValue: []
+    allowNull: true,
+    comment: '游戏截图'
   },
   game_file_url: {
     type: DataTypes.STRING(255),
-    allowNull: true
+    allowNull: true,
+    comment: '游戏文件URL'
   },
   rom_file_name: {
     type: DataTypes.STRING(100),
-    allowNull: true
+    allowNull: true,
+    comment: 'ROM文件名'
   },
-  // 游戏配置
   controls: {
     type: DataTypes.JSON,
-    defaultValue: {
-      player1: {
-        up: 'ArrowUp',
-        down: 'ArrowDown',
-        left: 'ArrowLeft',
-        right: 'ArrowRight',
-        button1: 'Space',
-        button2: 'KeyZ',
-        button3: 'KeyX',
-        button4: 'KeyC',
-        button5: 'KeyV',
-        button6: 'KeyB'
-      },
-      player2: {
-        up: 'KeyW',
-        down: 'KeyS',
-        left: 'KeyA',
-        right: 'KeyD',
-        button1: 'KeyQ',
-        button2: 'KeyE',
-        button3: 'KeyR',
-        button4: 'KeyT',
-        button5: 'KeyY',
-        button6: 'KeyU'
-      }
-    }
+    allowNull: true,
+    comment: '按键配置'
   },
   max_players: {
     type: DataTypes.INTEGER,
     defaultValue: 1,
-    validate: {
-      min: 1,
-      max: 4
-    }
+    comment: '最大玩家数'
   },
   supports_online: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: false,
+    comment: '是否支持在线对战'
   },
   supports_ai: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: false,
+    comment: '是否支持AI对战'
   },
   difficulty_levels: {
     type: DataTypes.JSON,
-    defaultValue: ['easy', 'normal', 'hard']
+    allowNull: true,
+    comment: '难度等级'
   },
-  // 游戏统计
   total_plays: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    defaultValue: 0,
+    comment: '总游戏次数'
   },
   total_players: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    defaultValue: 0,
+    comment: '总玩家数'
   },
   average_rating: {
     type: DataTypes.DECIMAL(3, 2),
-    defaultValue: 0.00
+    defaultValue: 0.00,
+    comment: '平均评分'
   },
   rating_count: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    defaultValue: 0,
+    comment: '评分次数'
   },
   favorite_count: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    defaultValue: 0,
+    comment: '收藏次数'
   },
-  // 游戏状态
   status: {
     type: DataTypes.ENUM('active', 'inactive', 'maintenance', 'deprecated'),
-    defaultValue: 'active'
+    defaultValue: 'active',
+    comment: '游戏状态'
   },
   is_featured: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: false,
+    comment: '是否推荐'
   },
   is_new: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: false,
+    comment: '是否新游戏'
   },
   is_hot: {
     type: DataTypes.BOOLEAN,
-    defaultValue: false
+    defaultValue: false,
+    comment: '是否热门'
   },
-  // 游戏设置
   file_size: {
     type: DataTypes.INTEGER,
-    defaultValue: 0 // 文件大小（字节）
+    defaultValue: 0,
+    comment: '文件大小（字节）'
   },
   min_age: {
     type: DataTypes.INTEGER,
-    defaultValue: 0 // 最低年龄限制
+    defaultValue: 0,
+    comment: '最低年龄限制'
   },
   tags: {
     type: DataTypes.JSON,
-    defaultValue: []
+    allowNull: true,
+    comment: '游戏标签'
   },
-  // 技术信息
   emulator_type: {
     type: DataTypes.STRING(50),
-    allowNull: true // 如 'mame', 'fba', 'nes', 'snes' 等
+    allowNull: true,
+    comment: '模拟器类型'
   },
   original_resolution: {
     type: DataTypes.STRING(20),
-    allowNull: true // 如 '320x240'
+    allowNull: true,
+    comment: '原始分辨率'
   },
   frame_rate: {
     type: DataTypes.INTEGER,
-    defaultValue: 60
+    defaultValue: 60,
+    comment: '帧率'
   },
-  // 排序权重
   sort_order: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    defaultValue: 0,
+    comment: '排序权重'
   }
 }, {
   tableName: 'games',
@@ -279,24 +259,46 @@ Game.prototype.calculatePopularityScore = function() {
 };
 
 // 类方法
-Game.findByCategory = function(category, limit = 20) {
+Game.getFeaturedGames = function(limit = 10) {
   return this.findAll({
     where: { 
-      category,
-      status: 'active'
+      status: 'active',
+      is_featured: true 
     },
-    order: [['sort_order', 'ASC'], ['total_plays', 'DESC']],
+    order: [['sort_order', 'DESC'], ['total_plays', 'DESC']],
     limit
   });
 };
 
-Game.getFeaturedGames = function(limit = 10) {
+Game.getNewGames = function(limit = 10) {
   return this.findAll({
     where: { 
-      is_featured: true,
-      status: 'active'
+      status: 'active',
+      is_new: true 
     },
-    order: [['sort_order', 'ASC']],
+    order: [['created_at', 'DESC']],
+    limit
+  });
+};
+
+Game.getHotGames = function(limit = 10) {
+  return this.findAll({
+    where: { 
+      status: 'active',
+      is_hot: true 
+    },
+    order: [['total_plays', 'DESC']],
+    limit
+  });
+};
+
+Game.getGamesByCategory = function(category, limit = 20) {
+  return this.findAll({
+    where: { 
+      status: 'active',
+      category 
+    },
+    order: [['total_plays', 'DESC']],
     limit
   });
 };
@@ -305,28 +307,6 @@ Game.getPopularGames = function(limit = 20) {
   return this.findAll({
     where: { status: 'active' },
     order: [['total_plays', 'DESC'], ['average_rating', 'DESC']],
-    limit
-  });
-};
-
-Game.getNewGames = function(limit = 10) {
-  return this.findAll({
-    where: { 
-      is_new: true,
-      status: 'active'
-    },
-    order: [['created_at', 'DESC']],
-    limit
-  });
-};
-
-Game.getHotGames = function(limit = 15) {
-  return this.findAll({
-    where: { 
-      is_hot: true,
-      status: 'active'
-    },
-    order: [['total_plays', 'DESC']],
     limit
   });
 };

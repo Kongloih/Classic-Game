@@ -27,6 +27,7 @@ import GuildPage from './pages/social/GuildPage';
 import BattlePage from './pages/battle/BattlePage';
 import BattleRoomPage from './pages/battle/BattleRoomPage';
 import TetrisTestPage from './pages/test/TetrisTestPage';
+import GameTestPage from './pages/test/GameTestPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Redux actions
@@ -214,14 +215,15 @@ function App() {
                       <BattlePage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/battle/room/:roomId" element={
+                  <Route path="/battle/room/:gameId/:roomId" element={
                     <ProtectedRoute>
                       <BattleRoomPage />
                     </ProtectedRoute>
                   } />
                   
-                  {/* 测试路由 - 暂时注释掉 */}
-                  {/* <Route path="/test/tetris" element={<TetrisTestPage />} /> */}
+                  {/* 测试路由 */}
+                  <Route path="/test/tetris" element={<TetrisTestPage />} />
+                  <Route path="/test/games" element={<GameTestPage />} />
                   
                   {/* 排行榜 */}
                   <Route path="/leaderboard" element={<LeaderboardPage />} />

@@ -28,57 +28,158 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { socketService } from '../../services/socketService';
 
 const BattleRoomPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { roomId } = useParams();
+  const { gameId, roomId } = useParams();
   const { user } = useSelector(state => state.auth);
   
   const [roomData, setRoomData] = useState(null);
   const [gameState, setGameState] = useState('waiting'); // waiting, ready, playing, finished
   const [countdown, setCountdown] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // 模拟房间数据
+  // 游戏类型映射
+  const gameTypeMap = {
+    '1': '俄罗斯方块',
+    '2': '贪吃蛇',
+    '3': '打砖块',
+    '4': '2048',
+    '5': '扫雷',
+    '6': '五子棋'
+  };
+
+  // 连接WebSocket并加入房间
   useEffect(() => {
-    const generateRoomData = () => {
-      const players = [
-        {
-          id: 1,
-          username: user?.username || '玩家1',
-          avatar: null,
-          score: 0,
-          isReady: true,
-          isHost: true,
-        },
-        {
-          id: 2,
-          username: `玩家${Math.floor(Math.random() * 1000)}`,
-          avatar: null,
-          score: 0,
-          isReady: Math.random() > 0.3,
-          isHost: false,
-        },
-      ];
+    const connectToRoom = async () => {
+      try {
+        setLoading(true);
+        
+        // 连接WebSocket
+        await socketService.connect();
+        
+        // 加入游戏房间
+        socketService.emit('join_game_room', {
+          roomId,
+          gameType: gameTypeMap[gameId] || '俄罗斯方块'
+        });
 
-      setRoomData({
-        id: roomId,
-        gameType: '俄罗斯方块',
-        players,
-        maxPlayers: 2,
-        status: players.length === 2 ? 'ready' : 'waiting',
-        createdAt: new Date(),
-        settings: {
-          difficulty: 'normal',
-          timeLimit: 300, // 5分钟
-          rounds: 3,
-        },
-      });
+        // 监听房间信息
+        socketService.on('room_info', (data) => {
+          setRoomData({
+            id: data.roomId,
+            gameType: data.gameType,
+            gameId: gameId,
+            players: data.players,
+            maxPlayers: 2,
+            status: data.gameState,
+            createdAt: new Date(),
+            settings: {
+              difficulty: 'normal',
+              timeLimit: 300,
+              rounds: 3,
+            },
+          });
+          setGameState(data.gameState);
+          setLoading(false);
+        });
+
+        // 监听玩家加入
+        socketService.on('player_joined_game', (data) => {
+          setRoomData(prev => {
+            if (!prev) return prev;
+            const newPlayers = [...prev.players];
+            const existingIndex = newPlayers.findIndex(p => p.id === data.playerId);
+            
+            if (existingIndex >= 0) {
+              newPlayers[existingIndex] = {
+                ...newPlayers[existingIndex],
+                ...data
+              };
+            } else {
+              newPlayers.push({
+                id: data.playerId,
+                username: data.playerName,
+                avatar: data.avatar,
+                level: data.level,
+                score: 0,
+                isReady: false,
+                isHost: data.isHost,
+              });
+            }
+            
+            return {
+              ...prev,
+              players: newPlayers,
+              status: newPlayers.length === 2 ? 'ready' : 'waiting'
+            };
+          });
+        });
+
+        // 监听玩家准备状态
+        socketService.on('player_ready_status', (data) => {
+          setRoomData(prev => {
+            if (!prev) return prev;
+            const newPlayers = prev.players.map(player =>
+              player.id === data.playerId
+                ? { ...player, isReady: data.isReady }
+                : player
+            );
+            return { ...prev, players: newPlayers };
+          });
+        });
+
+        // 监听所有玩家准备
+        socketService.on('all_players_ready', (data) => {
+          setGameState('ready');
+          setCountdown(data.countdown);
+        });
+
+        // 监听游戏开始
+        socketService.on('game_started', (data) => {
+          setGameState('playing');
+        });
+
+        // 监听游戏结束
+        socketService.on('game_finished', (data) => {
+          setGameState('finished');
+        });
+
+        // 监听玩家离开
+        socketService.on('player_left_game', (data) => {
+          setRoomData(prev => {
+            if (!prev) return prev;
+            const newPlayers = prev.players.filter(p => p.id !== data.playerId);
+            return {
+              ...prev,
+              players: newPlayers,
+              status: newPlayers.length === 0 ? 'waiting' : 'ready'
+            };
+          });
+        });
+
+      } catch (error) {
+        console.error('连接房间失败:', error);
+        setLoading(false);
+      }
     };
 
-    generateRoomData();
-  }, [roomId, user]);
+    connectToRoom();
+
+    // 清理函数
+    return () => {
+      socketService.off('room_info');
+      socketService.off('player_joined_game');
+      socketService.off('player_ready_status');
+      socketService.off('all_players_ready');
+      socketService.off('game_started');
+      socketService.off('game_finished');
+      socketService.off('player_left_game');
+    };
+  }, [roomId, gameId]);
 
   // 倒计时效果
   useEffect(() => {
@@ -95,37 +196,42 @@ const BattleRoomPage = () => {
 
   const handleReady = () => {
     if (roomData) {
-      const updatedPlayers = roomData.players.map(player =>
-        player.id === user?.id ? { ...player, isReady: !player.isReady } : player
-      );
-      setRoomData({ ...roomData, players: updatedPlayers });
+      const currentPlayer = roomData.players.find(p => p.id === user?.id);
+      const newReadyState = !currentPlayer?.isReady;
+      
+      socketService.emit('player_ready', {
+        roomId,
+        isReady: newReadyState
+      });
     }
   };
 
   const handleStartGame = () => {
-    setGameState('ready');
-    setCountdown(5);
+    socketService.emit('start_game', { roomId });
   };
 
   const handleLeaveRoom = () => {
+    // 离开房间逻辑
     navigate('/games');
   };
 
   const handleStartPlaying = () => {
-    // 根据游戏类型跳转到对应的游戏页面
-    const gameTypeMap = {
-      '俄罗斯方块': '1',
-      '贪吃蛇': '2',
-      '打砖块': '3'
-    };
-    const gameId = gameTypeMap[roomData?.gameType] || '1';
-    navigate(`/play/${gameId}`);
+    const targetGameId = roomData?.gameId || '1';
+    navigate(`/play/${targetGameId}`);
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Typography>连接房间中...</Typography>
+      </Box>
+    );
+  }
 
   if (!roomData) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <Typography>加载中...</Typography>
+        <Typography>房间不存在或连接失败</Typography>
       </Box>
     );
   }
@@ -228,6 +334,7 @@ const BattleRoomPage = () => {
                         bgcolor: player.isHost ? 'primary.main' : 'secondary.main',
                         fontSize: '1.5rem',
                       }}
+                      src={player.avatar}
                     >
                       {player.username.charAt(0)}
                     </Avatar>
@@ -244,35 +351,51 @@ const BattleRoomPage = () => {
                         )}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        分数: {player.score}
+                        等级 {player.level} • 分数 {player.score}
                       </Typography>
                     </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      {player.isReady ? (
-                        <Chip
-                          label="已准备"
-                          color="success"
-                          size="small"
-                          icon={<PlayArrow />}
-                        />
-                      ) : (
-                        <Chip
-                          label="未准备"
-                          color="warning"
-                          size="small"
-                        />
-                      )}
+                    <Chip
+                      label={player.isReady ? '已准备' : '未准备'}
+                      color={player.isReady ? 'success' : 'default'}
+                      variant={player.isReady ? 'filled' : 'outlined'}
+                    />
+                  </Box>
+
+                  {/* 玩家统计 */}
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        等级
+                      </Typography>
+                      <Typography variant="h6">
+                        {player.level}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        分数
+                      </Typography>
+                      <Typography variant="h6">
+                        {player.score}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        行数
+                      </Typography>
+                      <Typography variant="h6">
+                        {player.lines || 0}
+                      </Typography>
                     </Box>
                   </Box>
 
-                  {/* 准备状态 */}
-                  {player.id === user?.id && (
+                  {/* 准备按钮 */}
+                  {player.id === user?.id && gameState === 'waiting' && (
                     <Button
-                      variant={player.isReady ? "outlined" : "contained"}
-                      color={player.isReady ? "success" : "primary"}
+                      variant={player.isReady ? 'outlined' : 'contained'}
+                      color={player.isReady ? 'success' : 'primary'}
                       fullWidth
                       onClick={handleReady}
-                      disabled={gameState === 'playing'}
                     >
                       {player.isReady ? '取消准备' : '准备'}
                     </Button>
@@ -281,107 +404,31 @@ const BattleRoomPage = () => {
               </Card>
             </Grid>
           ))}
-
-          {/* 空座位 */}
-          {Array.from({ length: roomData.maxPlayers - roomData.players.length }).map((_, index) => (
-            <Grid item xs={12} md={6} key={`empty-${index}`}>
-              <Card
-                sx={{
-                  height: '100%',
-                  border: '2px dashed',
-                  borderColor: 'grey.300',
-                  bgcolor: 'grey.50',
-                }}
-              >
-                <CardContent sx={{ 
-                  p: 3, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  height: '100%',
-                }}>
-                  <Avatar
-                    sx={{ 
-                      width: 64, 
-                      height: 64,
-                      bgcolor: 'grey.300',
-                      color: 'grey.600',
-                      mb: 2,
-                    }}
-                  >
-                    ?
-                  </Avatar>
-                  <Typography variant="h6" color="text.secondary">
-                    等待玩家加入
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
         </Grid>
 
-        {/* 游戏控制 */}
-        {roomData.players.length === roomData.maxPlayers && (
+        {/* 游戏控制按钮 */}
+        {gameState === 'waiting' && roomData.players.length >= 2 && (
           <Box sx={{ mt: 4, textAlign: 'center' }}>
-            {gameState === 'waiting' && (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<PlayArrow />}
-                onClick={handleStartGame}
-                disabled={!roomData.players.every(p => p.isReady)}
-                sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  px: 4,
-                  py: 1.5,
-                  fontSize: '1.1rem',
-                }}
-              >
-                开始游戏
-              </Button>
-            )}
-            
-            {gameState === 'playing' && (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<PlayArrow />}
-                onClick={handleStartPlaying}
-                sx={{
-                  background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
-                  px: 4,
-                  py: 1.5,
-                  fontSize: '1.1rem',
-                }}
-              >
-                进入游戏
-              </Button>
-            )}
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<PlayArrow />}
+              onClick={handleStartPlaying}
+              disabled={!roomData.players.every(p => p.isReady)}
+            >
+              开始游戏
+            </Button>
           </Box>
         )}
 
         {/* 设置对话框 */}
-        <Dialog open={showSettings} onClose={() => setShowSettings(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>游戏设置</DialogTitle>
+        <Dialog open={showSettings} onClose={() => setShowSettings(false)}>
+          <DialogTitle>房间设置</DialogTitle>
           <DialogContent>
-            <Typography variant="body1" gutterBottom>
-              游戏类型: {roomData.gameType}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              难度: {roomData.settings.difficulty}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              时间限制: {roomData.settings.timeLimit}秒
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              回合数: {roomData.settings.rounds}
-            </Typography>
+            <Typography>房间设置功能开发中...</Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setShowSettings(false)}>
-              关闭
-            </Button>
+            <Button onClick={() => setShowSettings(false)}>关闭</Button>
           </DialogActions>
         </Dialog>
       </Container>

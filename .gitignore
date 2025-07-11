@@ -155,6 +155,6 @@ package.json.bak
 # 其他
 .yarn-integrity
 .pnp.*
-.pnp/
+.pnp/ 
 .vercel
 .netlify 

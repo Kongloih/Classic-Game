@@ -183,6 +183,19 @@ class RedisHelper {
       return true; // 返回成功，避免阻塞流程
     }
   }
+  
+  static async exists(key) {
+    try {
+      if (!redisClient) {
+        throw new Error('Redis客户端未连接');
+      }
+      const result = await redisClient.exists(key);
+      return result === 1;
+    } catch (error) {
+      console.warn('Redis不可用，跳过exists检查:', error.message);
+      return false; // 返回false，表示不存在
+    }
+  }
 }
 
 module.exports = {

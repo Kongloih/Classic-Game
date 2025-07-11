@@ -48,6 +48,14 @@ const User = sequelize.define('User', {
     type: DataTypes.DATEONLY,
     defaultValue: null
   },
+  birth_year: {
+    type: DataTypes.INTEGER,
+    defaultValue: null,
+    validate: {
+      min: 1900,
+      max: new Date().getFullYear()
+    }
+  },
   phone: {
     type: DataTypes.STRING(20),
     defaultValue: null,

@@ -28,6 +28,8 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import TetrisGame from '../../components/games/TetrisGame';
+import SnakeGame from '../../components/games/SnakeGame';
+import BreakoutGame from '../../components/games/BreakoutGame';
 
 const GamePlayPage = () => {
   const theme = useTheme();
@@ -90,11 +92,19 @@ const GamePlayPage = () => {
   const handlePause = () => {
     setGameState('paused');
     setShowPauseDialog(true);
+    // 通知游戏组件暂停
+    if (window.gamePauseCallback) {
+      window.gamePauseCallback();
+    }
   };
 
   const handleResume = () => {
     setGameState('playing');
     setShowPauseDialog(false);
+    // 通知游戏组件继续
+    if (window.gameResumeCallback) {
+      window.gameResumeCallback();
+    }
   };
 
   const handleGameOver = (score) => {
@@ -204,7 +214,7 @@ const GamePlayPage = () => {
                   border: '2px solid',
                   borderColor: 'primary.main',
                   borderRadius: 2,
-                  overflow: 'hidden',
+                  overflow: 'visible',
                 }}
               >
                 <Box
@@ -225,8 +235,34 @@ const GamePlayPage = () => {
                     />
                   )}
                   
+                  {/* 贪吃蛇游戏 */}
+                  {gameId === '2' && (
+                    <SnakeGame
+                      roomId={roomId}
+                      onGameOver={handleGameOver}
+                      onScoreUpdate={(newScore) => setScore(newScore)}
+                    />
+                  )}
+                  
+                  {/* 打砖块游戏 */}
+                  {gameId === '3' && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      minHeight: '600px',
+                      width: '100%'
+                    }}>
+                      <BreakoutGame
+                        roomId={roomId}
+                        onGameOver={handleGameOver}
+                        onScoreUpdate={(newScore) => setScore(newScore)}
+                      />
+                    </Box>
+                  )}
+                  
                   {/* 其他游戏 */}
-                  {gameId !== '1' && (
+                  {!['1', '2', '3'].includes(gameId) && (
                     <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -334,17 +370,54 @@ const GamePlayPage = () => {
                       操作说明
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        • 方向键: 移动控制
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        • 空格键: 特殊操作
-                      </Typography>
+                      {gameId === '1' && (
+                        <>
+                          <Typography variant="body2" color="text.secondary">
+                            • 方向键: 移动方块
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • 空格键: 快速下落
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • Z键: 旋转方块
+                          </Typography>
+                        </>
+                      )}
+                      {gameId === '2' && (
+                        <>
+                          <Typography variant="body2" color="text.secondary">
+                            • 方向键: 控制蛇的移动
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • 空格键: 暂停/继续
+                          </Typography>
+                        </>
+                      )}
+                      {gameId === '3' && (
+                        <>
+                          <Typography variant="body2" color="text.secondary">
+                            • 左右方向键: 移动球拍
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • A/D键: 移动球拍
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • 击碎所有砖块获胜
+                          </Typography>
+                        </>
+                      )}
+                      {!['1', '2', '3'].includes(gameId) && (
+                        <>
+                          <Typography variant="body2" color="text.secondary">
+                            • 方向键: 移动控制
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            • 空格键: 特殊操作
+                          </Typography>
+                        </>
+                      )}
                       <Typography variant="body2" color="text.secondary">
                         • ESC: 暂停游戏
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        • 鼠标: 点击操作
                       </Typography>
                     </Box>
                   </CardContent>

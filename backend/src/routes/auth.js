@@ -6,9 +6,86 @@ const User = require('../models/User');
 const { RedisHelper } = require('../config/redis');
 const { authMiddleware } = require('../middleware/auth');
 const { sendEmail } = require('../services/emailService');
+const smsService = require('../services/smsService');
 const crypto = require('crypto');
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * /api/auth/send-sms:
+ *   post:
+ *     summary: 发送短信验证码
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - phone
+ *               - type
+ *             properties:
+ *               phone:
+ *                 type: string
+ *                 pattern: '^1[3-9]\\d{9}$'
+ *               type:
+ *                 type: string
+ *                 enum: [register, login, reset]
+ *     responses:
+ *       200:
+ *         description: 发送成功
+ *       400:
+ *         description: 请求参数错误
+ *       429:
+ *         description: 发送过于频繁
+ */
+router.post('/send-sms', [
+  body('phone')
+    .matches(/^(\+86)?1[3-9]\d{9}$/)
+    .withMessage('请输入正确的手机号'),
+  body('type')
+    .isIn(['register', 'login', 'reset'])
+    .withMessage('验证码类型不正确')
+], async (req, res) => {
+  try {
+    // 验证请求参数
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '请求参数错误',
+        errors: errors.array()
+      });
+    }
+
+    const { phone, type } = req.body;
+
+    // 发送短信验证码
+    const result = await smsService.sendVerificationCode(phone, type);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        data: result.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('发送短信验证码错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
 
 /**
  * @swagger
@@ -55,8 +132,11 @@ router.post('/register', [
   body('username')
     .isLength({ min: 3, max: 50 })
     .withMessage('用户名长度必须在3-50个字符之间')
-    .isAlphanumeric()
-    .withMessage('用户名只能包含字母和数字'),
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage('用户名只能包含字母、数字和下划线'),
+  body('phone')
+    .matches(/^(\+86)?1[3-9]\d{9}$/)
+    .withMessage('请输入正确的手机号'),
   body('email')
     .isEmail()
     .withMessage('请输入有效的邮箱地址')
@@ -66,10 +146,17 @@ router.post('/register', [
     .withMessage('密码长度必须在6-128个字符之间')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('密码必须包含至少一个小写字母、一个大写字母和一个数字'),
-  body('nickname')
-    .isLength({ min: 1, max: 50 })
-    .withMessage('昵称长度必须在1-50个字符之间')
-    .trim()
+  body('verificationCode')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('验证码为6位数字')
+    .isNumeric()
+    .withMessage('验证码只能包含数字'),
+  body('gender')
+    .isIn(['male', 'female', 'other'])
+    .withMessage('性别选择不正确'),
+  body('birthYear')
+    .isInt({ min: 1900, max: new Date().getFullYear() })
+    .withMessage('出生年份不正确')
 ], async (req, res) => {
   try {
     // 验证请求参数
@@ -82,20 +169,34 @@ router.post('/register', [
       });
     }
 
-    const { username, email, password, nickname } = req.body;
+    const { username, phone, email, password, verificationCode, gender, birthYear } = req.body;
 
-    // 检查用户名和邮箱是否已存在
+    // 验证短信验证码
+    const isCodeValid = await smsService.verifyCode(phone, verificationCode, 'register');
+    if (!isCodeValid) {
+      return res.status(400).json({
+        success: false,
+        message: '验证码错误或已过期'
+      });
+    }
+
+    // 检查用户名、手机号和邮箱是否已存在
     const existingUser = await User.findOne({
       where: {
         [User.sequelize.Sequelize.Op.or]: [
           { username },
+          { phone },
           { email }
         ]
       }
     });
 
     if (existingUser) {
-      const field = existingUser.username === username ? '用户名' : '邮箱';
+      let field = '用户名';
+      if (existingUser.username === username) field = '用户名';
+      else if (existingUser.phone === phone) field = '手机号';
+      else if (existingUser.email === email) field = '邮箱';
+      
       return res.status(409).json({
         success: false,
         message: `${field}已被使用`
@@ -108,10 +209,14 @@ router.post('/register', [
     // 创建用户
     const user = await User.create({
       username,
+      phone,
       email,
       password,
-      nickname,
-      verification_token: verificationToken
+      nickname: username, // 使用用户名作为默认昵称
+      gender,
+      birth_year: birthYear,
+      verification_token: verificationToken,
+      is_verified: true // 手机号验证后直接设为已验证
     });
 
     // 发送验证邮件
@@ -149,7 +254,7 @@ router.post('/register', [
 
     res.status(201).json({
       success: true,
-      message: '注册成功，请查看邮箱验证邮件',
+      message: '注册成功！',
       data: {
         user: user.toJSON(),
         token,

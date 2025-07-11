@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-// 游戏房间状态管理
-const gameRooms = new Map();
+// 在线用户管理
+const onlineUsers = new Map(); // userId -> socket
+const gameRooms = new Map(); // roomId -> roomData
 
 const socketHandler = (io) => {
   // 身份验证中间件
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
     
     if (!token) {
@@ -14,8 +16,16 @@ const socketHandler = (io) => {
     
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      socket.userId = decoded.id;
-      socket.username = decoded.username;
+      
+      // 获取用户信息
+      const user = await User.findByPk(decoded.userId);
+      if (!user || user.status !== 'active') {
+        return next(new Error('User not found or inactive'));
+      }
+      
+      socket.userId = user.id;
+      socket.username = user.username;
+      socket.user = user;
       next();
     } catch (error) {
       next(new Error('Authentication error'));
@@ -23,16 +33,36 @@ const socketHandler = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`用户 ${socket.username} 已连接`);
+    console.log(`用户 ${socket.username} (ID: ${socket.userId}) 已连接`);
+
+    // 添加用户到在线列表
+    onlineUsers.set(socket.userId, socket);
 
     // 加入用户房间
     socket.join(`user_${socket.userId}`);
 
+    // 更新用户最后登录时间
+    User.update(
+      { last_login_at: new Date() },
+      { where: { id: socket.userId } }
+    );
+
     // 广播用户上线
     socket.broadcast.emit('user_online', {
       userId: socket.userId,
-      username: socket.username
+      username: socket.username,
+      avatar: socket.user.avatar,
+      level: socket.user.level
     });
+
+    // 发送在线用户列表给新连接的用户
+    const onlineUsersList = Array.from(onlineUsers.values()).map(s => ({
+      userId: s.userId,
+      username: s.username,
+      avatar: s.user.avatar,
+      level: s.user.level
+    }));
+    socket.emit('online_users_list', onlineUsersList);
 
     // 处理加入游戏房间
     socket.on('join_game_room', (data) => {
@@ -53,7 +83,8 @@ const socketHandler = (io) => {
           gameType,
           players: new Map(),
           gameState: 'waiting',
-          startTime: null
+          startTime: null,
+          createdAt: new Date()
         });
       }
       
@@ -61,16 +92,29 @@ const socketHandler = (io) => {
       room.players.set(socket.userId, {
         id: socket.userId,
         username: socket.username,
+        avatar: socket.user.avatar,
+        level: socket.user.level,
         ready: false,
         score: 0,
         lines: 0,
-        level: 1
+        isHost: room.players.size === 0 // 第一个加入的玩家是房主
       });
       
       // 通知房间内其他玩家
       socket.to(`game_${roomId}`).emit('player_joined_game', {
         playerId: socket.userId,
-        playerName: socket.username
+        playerName: socket.username,
+        avatar: socket.user.avatar,
+        level: socket.user.level,
+        isHost: room.players.get(socket.userId).isHost
+      });
+      
+      // 发送房间信息给新加入的玩家
+      socket.emit('room_info', {
+        roomId,
+        gameType,
+        players: Array.from(room.players.values()),
+        gameState: room.gameState
       });
       
       console.log(`用户 ${socket.username} 加入游戏房间 ${roomId}`);
@@ -78,7 +122,7 @@ const socketHandler = (io) => {
 
     // 处理玩家准备状态
     socket.on('player_ready', (data) => {
-      const { roomId, gameType, isReady } = data;
+      const { roomId, isReady } = data;
       const room = gameRooms.get(roomId);
       
       if (room && room.players.has(socket.userId)) {
@@ -91,26 +135,33 @@ const socketHandler = (io) => {
           isReady
         });
         
+        // 检查是否所有玩家都准备好了
+        const allReady = Array.from(room.players.values()).every(p => p.ready);
+        if (allReady && room.players.size >= 2) {
+          room.gameState = 'ready';
+          io.to(`game_${roomId}`).emit('all_players_ready', {
+            roomId,
+            countdown: 5
+          });
+        }
+        
         console.log(`用户 ${socket.username} ${isReady ? '准备' : '取消准备'}`);
       }
     });
 
-    // 处理游戏开始请求
-    socket.on('request_game_start', (data) => {
-      const { roomId, gameType } = data;
+    // 处理游戏开始
+    socket.on('start_game', (data) => {
+      const { roomId } = data;
       const room = gameRooms.get(roomId);
       
-      if (room) {
-        const allReady = Array.from(room.players.values()).every(player => player.ready);
-        
-        if (allReady && room.players.size >= 2) {
+      if (room && room.players.has(socket.userId)) {
+        const player = room.players.get(socket.userId);
+        if (player.isHost) {
           room.gameState = 'playing';
-          room.startTime = Date.now();
+          room.startTime = new Date();
           
-          // 通知所有玩家游戏开始
           io.to(`game_${roomId}`).emit('game_started', {
             roomId,
-            gameType,
             startTime: room.startTime
           });
           
@@ -119,89 +170,73 @@ const socketHandler = (io) => {
       }
     });
 
-    // 处理游戏状态更新
-    socket.on('game_state_update', (data) => {
-      const { roomId, gameType, gameState } = data;
+    // 处理游戏数据更新
+    socket.on('game_update', (data) => {
+      const { roomId, score, lines, level } = data;
       const room = gameRooms.get(roomId);
       
       if (room && room.players.has(socket.userId)) {
         const player = room.players.get(socket.userId);
-        player.score = gameState.score || player.score;
-        player.lines = gameState.lines || player.lines;
-        player.level = gameState.level || player.level;
+        player.score = score;
+        player.lines = lines;
+        player.level = level;
         
-        // 发送给对手
-        socket.to(`game_${roomId}`).emit('opponent_state_update', {
-          board: gameState.board,
-          score: gameState.score,
-          lines: gameState.lines,
-          level: gameState.level
+        // 广播给房间内其他玩家
+        socket.to(`game_${roomId}`).emit('player_game_update', {
+          playerId: socket.userId,
+          playerName: socket.username,
+          score,
+          lines,
+          level
         });
       }
     });
 
     // 处理游戏结束
     socket.on('game_over', (data) => {
-      const { roomId, gameType, finalScore } = data;
+      const { roomId, finalScore, result } = data;
       const room = gameRooms.get(roomId);
       
       if (room && room.players.has(socket.userId)) {
         const player = room.players.get(socket.userId);
         player.score = finalScore;
+        player.gameResult = result;
         
-        // 通知对手游戏结束
-        socket.to(`game_${roomId}`).emit('game_over', {
-          winnerId: socket.userId,
-          winnerName: socket.username,
-          finalScore
-        });
+        // 更新用户游戏统计
+        User.updateGameStats(socket.userId, result, finalScore);
         
-        console.log(`用户 ${socket.username} 游戏结束，最终分数: ${finalScore}`);
-      }
-    });
-
-    // 处理离开游戏房间
-    socket.on('leave_game_room', (data) => {
-      const { roomId, gameType } = data;
-      
-      socket.leave(`game_${roomId}`);
-      
-      const room = gameRooms.get(roomId);
-      if (room && room.players.has(socket.userId)) {
-        room.players.delete(socket.userId);
-        
-        // 通知其他玩家
-        socket.to(`game_${roomId}`).emit('player_left_game', {
+        // 通知房间内其他玩家
+        socket.to(`game_${roomId}`).emit('player_game_over', {
           playerId: socket.userId,
-          playerName: socket.username
+          playerName: socket.username,
+          finalScore,
+          result
         });
         
-        // 如果房间空了，删除房间
-        if (room.players.size === 0) {
-          gameRooms.delete(roomId);
+        // 检查是否所有玩家都结束了
+        const allFinished = Array.from(room.players.values()).every(p => p.gameResult);
+        if (allFinished) {
+          room.gameState = 'finished';
+          io.to(`game_${roomId}`).emit('game_finished', {
+            roomId,
+            results: Array.from(room.players.values()).map(p => ({
+              id: p.id,
+              username: p.username,
+              score: p.score,
+              result: p.gameResult
+            }))
+          });
         }
-        
-        console.log(`用户 ${socket.username} 离开游戏房间 ${roomId}`);
       }
-    });
-
-    // 处理游戏动作（通用）
-    socket.on('game_action', (data) => {
-      const { roomId, action, gameData } = data;
-      socket.to(`game_${roomId}`).emit('game_update', {
-        userId: socket.userId,
-        username: socket.username,
-        action,
-        gameData
-      });
     });
 
     // 处理聊天消息
     socket.on('chat_message', (data) => {
       const { roomId, message } = data;
-      io.to(`chat_${roomId}`).emit('new_message', {
+      io.to(`game_${roomId}`).emit('new_message', {
         userId: socket.userId,
         username: socket.username,
+        avatar: socket.user.avatar,
         message,
         timestamp: new Date().toISOString()
       });
@@ -210,15 +245,23 @@ const socketHandler = (io) => {
     // 处理好友请求
     socket.on('friend_request', (data) => {
       const { targetUserId } = data;
-      io.to(`user_${targetUserId}`).emit('friend_request_received', {
-        fromUserId: socket.userId,
-        fromUsername: socket.username
-      });
+      const targetSocket = onlineUsers.get(targetUserId);
+      
+      if (targetSocket) {
+        targetSocket.emit('friend_request_received', {
+          fromUserId: socket.userId,
+          fromUsername: socket.username,
+          fromAvatar: socket.user.avatar
+        });
+      }
     });
 
     // 处理断开连接
     socket.on('disconnect', () => {
-      console.log(`用户 ${socket.username} 已断开连接`);
+      console.log(`用户 ${socket.username} (ID: ${socket.userId}) 已断开连接`);
+      
+      // 从在线用户列表中移除
+      onlineUsers.delete(socket.userId);
       
       // 从所有游戏房间中移除用户
       gameRooms.forEach((room, roomId) => {
@@ -234,6 +277,7 @@ const socketHandler = (io) => {
           // 如果房间空了，删除房间
           if (room.players.size === 0) {
             gameRooms.delete(roomId);
+            console.log(`游戏房间 ${roomId} 已删除（无玩家）`);
           }
         }
       });
@@ -245,6 +289,16 @@ const socketHandler = (io) => {
       });
     });
   });
+
+  // 定期清理断开的连接
+  setInterval(() => {
+    onlineUsers.forEach((socket, userId) => {
+      if (!socket.connected) {
+        onlineUsers.delete(userId);
+        console.log(`清理断开的连接: 用户 ${userId}`);
+      }
+    });
+  }, 30000); // 每30秒检查一次
 };
 
 module.exports = socketHandler; 
