@@ -58,14 +58,51 @@ const BattleRoomPage = () => {
       try {
         setLoading(true);
         
+        // 检查是否为测试模式（通过URL路径判断）
+        const isTestMode = window.location.pathname.includes('/test/') || 
+                          !localStorage.getItem('token');
+        
         // 连接WebSocket
-        await socketService.connect();
+        await socketService.connect(isTestMode);
         
         // 加入游戏房间
         socketService.emit('join_game_room', {
           roomId,
           gameType: gameTypeMap[gameId] || '俄罗斯方块'
         });
+
+        // 如果是测试模式，创建模拟房间数据
+        if (isTestMode) {
+          setTimeout(() => {
+            const mockRoomData = {
+              id: roomId,
+              gameType: gameTypeMap[gameId] || '俄罗斯方块',
+              gameId: gameId,
+              players: [
+                {
+                  id: 'test_user_1',
+                  username: '测试玩家',
+                  avatar: null,
+                  level: 1,
+                  score: 0,
+                  isReady: true,
+                  isHost: true,
+                }
+              ],
+              maxPlayers: 2,
+              status: 'waiting',
+              createdAt: new Date(),
+              settings: {
+                difficulty: 'normal',
+                timeLimit: 300,
+                rounds: 3,
+              },
+            };
+            setRoomData(mockRoomData);
+            setGameState('waiting');
+            setLoading(false);
+          }, 1000); // 模拟网络延迟
+        }
 
         // 监听房间信息
         socketService.on('room_info', (data) => {

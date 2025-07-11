@@ -226,7 +226,7 @@ router.post('/register', [
         subject: '欢迎加入经典街机游戏平台 - 请验证您的邮箱',
         template: 'verification',
         data: {
-          nickname,
+          nickname: username, // 使用 username 作为 nickname
           verificationLink: `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
         }
       });
@@ -811,6 +811,47 @@ router.get('/me', authMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('获取用户信息错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误'
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/status:
+ *   get:
+ *     summary: 获取用户状态
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 获取成功
+ *       401:
+ *         description: 未认证
+ */
+router.get('/status', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: '用户不存在'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: user.toJSON()
+      }
+    });
+
+  } catch (error) {
+    console.error('获取用户状态错误:', error);
     res.status(500).json({
       success: false,
       message: '服务器内部错误'

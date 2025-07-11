@@ -10,7 +10,28 @@ const socketHandler = (io) => {
   io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
     
+    // 如果没有token，检查是否为开发环境下的测试模式
     if (!token) {
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const isTestMode = socket.handshake.query.testMode === 'true' || 
+                        socket.handshake.auth.testMode === true;
+      
+      if (isTestMode && isDevelopment) {
+        // 开发环境测试模式：创建匿名用户
+        console.log('🔧 开发模式：创建匿名Socket用户');
+        socket.userId = `test_user_${Date.now()}`;
+        socket.username = '测试用户';
+        socket.user = {
+          id: socket.userId,
+          username: socket.username,
+          avatar: null,
+          level: 1,
+          status: 'active'
+        };
+        socket.isTestMode = true;
+        return next();
+      }
+      
       return next(new Error('Authentication error'));
     }
     
@@ -26,6 +47,7 @@ const socketHandler = (io) => {
       socket.userId = user.id;
       socket.username = user.username;
       socket.user = user;
+      socket.isTestMode = false;
       next();
     } catch (error) {
       next(new Error('Authentication error'));
@@ -33,7 +55,7 @@ const socketHandler = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`用户 ${socket.username} (ID: ${socket.userId}) 已连接`);
+    console.log(`用户 ${socket.username} (ID: ${socket.userId}) 已连接${socket.isTestMode ? ' (测试模式)' : ''}`);
 
     // 添加用户到在线列表
     onlineUsers.set(socket.userId, socket);
@@ -41,11 +63,13 @@ const socketHandler = (io) => {
     // 加入用户房间
     socket.join(`user_${socket.userId}`);
 
-    // 更新用户最后登录时间
-    User.update(
-      { last_login_at: new Date() },
-      { where: { id: socket.userId } }
-    );
+    // 如果不是测试模式，更新用户最后登录时间
+    if (!socket.isTestMode) {
+      User.update(
+        { last_login_at: new Date() },
+        { where: { id: socket.userId } }
+      );
+    }
 
     // 广播用户上线
     socket.broadcast.emit('user_online', {

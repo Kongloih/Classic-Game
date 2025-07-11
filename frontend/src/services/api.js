@@ -38,7 +38,13 @@ api.interceptors.response.use(
 // 游戏相关API
 export const gameApi = {
   // 获取游戏大厅数据
-  getGameHall: (gameId) => api.get(`/games/hall/${gameId}`),
+  getGameHall: (gameId, testMode = false) => {
+    const params = {};
+    if (testMode) {
+      params.testMode = 'true';
+    }
+    return api.get(`/games/hall/${gameId}`, { params });
+  },
   
   // 获取在线用户列表
   getOnlineUsers: (limit = 20) => api.get('/games/online-users', { params: { limit } }),
@@ -51,6 +57,24 @@ export const gameApi = {
   
   // 获取游戏详情
   getGame: (gameId) => api.get(`/games/${gameId}`),
+};
+
+// 认证相关API
+export const authApi = {
+  // 用户注册
+  register: (userData) => api.post('/auth/register', userData),
+  
+  // 用户登录
+  login: (loginData) => api.post('/auth/login', loginData),
+  
+  // 发送短信验证码
+  sendSms: (smsData) => api.post('/auth/send-sms', smsData),
+  
+  // 获取认证状态
+  getAuthStatus: () => api.get('/auth/status'),
+  
+  // 用户登出
+  logout: () => api.post('/auth/logout'),
 };
 
 // 用户相关API

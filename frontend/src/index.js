@@ -4,8 +4,8 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { ReactQueryDevtools } from 'react-query/devtools';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
@@ -64,7 +64,12 @@ root.render(
             <QueryClientProvider client={queryClient}>
               <ThemeProvider theme={theme}>
                 <CssBaseline />
-                <BrowserRouter>
+                <BrowserRouter
+                  future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true
+                  }}
+                >
                   <App />
                   
                   {/* Toast 通知 */}
@@ -158,7 +163,12 @@ if (module.hot && process.env.NODE_ENV === 'development') {
                 <QueryClientProvider client={queryClient}>
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
-                    <BrowserRouter>
+                    <BrowserRouter
+                      future={{
+                        v7_startTransition: true,
+                        v7_relativeSplatPath: true
+                      }}
+                    >
                       <NextApp />
                     </BrowserRouter>
                   </ThemeProvider>

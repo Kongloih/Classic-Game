@@ -53,7 +53,13 @@ const GameHallPage = () => {
     const fetchGameHallData = async () => {
       try {
         setLoading(true);
-        const response = await gameApi.getGameHall(gameId);
+        
+        // 检查是否为测试模式（没有认证token或URL包含test）
+        const isTestMode = !localStorage.getItem('token') || 
+                          window.location.pathname.includes('/test/') ||
+                          window.location.search.includes('testMode=true');
+        
+        const response = await gameApi.getGameHall(gameId, isTestMode);
         
         if (response.success) {
           setGameInfo(response.data.game);

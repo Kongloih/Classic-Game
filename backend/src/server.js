@@ -42,7 +42,7 @@ const battleRoutes = require('./routes/battle');
 const socketHandler = require('./socket/socketHandler');
 
 // 导入数据库连接
-const { connectDB } = require('./config/database');
+const { sequelize, testConnection } = require('./config/database');
 const { connectRedis } = require('./config/redis');
 
 // 导入中间件
@@ -165,8 +165,8 @@ socketHandler(io);
 // 数据库连接
 const initializeDatabase = async () => {
   try {
-    await connectDB();
-    console.log('✅ MySQL数据库连接成功');
+    await testConnection();
+    console.log('✅ 数据库连接成功');
     
     // 尝试连接Redis，但不阻止服务器启动
     try {

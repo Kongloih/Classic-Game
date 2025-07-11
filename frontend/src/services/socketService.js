@@ -7,32 +7,47 @@ class SocketService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000;
+    this.isTestMode = false;
   }
 
-  async connect() {
+  async connect(testMode = false) {
     if (this.socket && this.isConnected) {
       return this.socket;
     }
 
+    this.isTestMode = testMode;
+
     return new Promise((resolve, reject) => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
+        
+        // 在测试模式下，如果没有token，使用匿名连接
+        if (!token && !testMode) {
           reject(new Error('No authentication token found'));
           return;
         }
 
-        this.socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001', {
-          auth: { token },
+        const socketOptions = {
           transports: ['websocket', 'polling'],
           timeout: 10000,
           reconnection: true,
           reconnectionAttempts: this.maxReconnectAttempts,
           reconnectionDelay: this.reconnectDelay,
-        });
+        };
+
+        // 如果有token，添加认证
+        if (token) {
+          socketOptions.auth = { token };
+        } else if (testMode) {
+          // 测试模式：添加测试模式标识
+          socketOptions.auth = { testMode: true };
+          socketOptions.query = { testMode: 'true' };
+        }
+
+        this.socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001', socketOptions);
 
         this.socket.on('connect', () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket connected', testMode ? '(测试模式)' : '');
           this.isConnected = true;
           this.reconnectAttempts = 0;
           resolve(this.socket);
@@ -52,7 +67,7 @@ class SocketService {
           console.error('WebSocket connection error:', error);
           this.isConnected = false;
           
-          if (error.message === 'Authentication error') {
+          if (error.message === 'Authentication error' && !testMode) {
             // 认证失败，清除token并重定向到登录页
             localStorage.removeItem('token');
             window.location.href = '/login';

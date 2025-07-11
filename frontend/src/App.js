@@ -28,6 +28,7 @@ import BattlePage from './pages/battle/BattlePage';
 import BattleRoomPage from './pages/battle/BattleRoomPage';
 import TetrisTestPage from './pages/test/TetrisTestPage';
 import GameTestPage from './pages/test/GameTestPage';
+import SimpleGameTestPage from './pages/test/SimpleGameTestPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Redux actions
@@ -54,7 +55,7 @@ function App() {
         // 检查认证状态
         await dispatch(checkAuthStatus()).unwrap();
       } catch (error) {
-        console.error('初始化应用失败:', error);
+        console.log('初始化应用 - 未找到认证token，这是正常的');
       } finally {
         setAppLoading(false);
       }
@@ -224,6 +225,7 @@ function App() {
                   {/* 测试路由 */}
                   <Route path="/test/tetris" element={<TetrisTestPage />} />
                   <Route path="/test/games" element={<GameTestPage />} />
+                  <Route path="/test/simple" element={<SimpleGameTestPage />} />
                   
                   {/* 排行榜 */}
                   <Route path="/leaderboard" element={<LeaderboardPage />} />

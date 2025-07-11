@@ -4,84 +4,6 @@
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-});
-
-// Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  observe() {
-    return null;
-  }
-  disconnect() {
-    return null;
-  }
-  unobserve() {
-    return null;
-  }
-};
-
-// Mock ResizeObserver
-global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  observe() {
-    return null;
-  }
-  disconnect() {
-    return null;
-  }
-  unobserve() {
-    return null;
-  }
-};
-
-// Mock window.scrollTo
-window.scrollTo = jest.fn();
-
-// Mock console methods to reduce noise in tests
-const originalError = console.error;
-const originalWarn = console.warn;
-
-beforeAll(() => {
-  console.error = (...args) => {
-    if (
-      typeof args[0] === 'string' &&
-      args[0].includes('Warning: ReactDOM.render is deprecated')
-    ) {
-      return;
-    }
-    originalError.call(console, ...args);
-  };
-  
-  console.warn = (...args) => {
-    if (
-      typeof args[0] === 'string' &&
-      (args[0].includes('Warning: componentWillReceiveProps') ||
-       args[0].includes('Warning: componentWillUpdate'))
-    ) {
-      return;
-    }
-    originalWarn.call(console, ...args);
-  };
-});
-
-afterAll(() => {
-  console.error = originalError;
-  console.warn = originalWarn;
-});
-
 // Mock localStorage
 const localStorageMock = {
   getItem: jest.fn(),
@@ -100,34 +22,99 @@ const sessionStorageMock = {
 };
 global.sessionStorage = sessionStorageMock;
 
-// Mock fetch
-global.fetch = jest.fn();
-
-// Mock WebSocket
-global.WebSocket = class WebSocket {
-  constructor(url) {
-    this.url = url;
-    this.readyState = 0; // CONNECTING
-    this.onopen = null;
-    this.onclose = null;
-    this.onmessage = null;
-    this.onerror = null;
-  }
-  
-  send(data) {
-    return data;
-  }
-  
-  close() {
-    this.readyState = 3; // CLOSED
-  }
+// Mock window.location
+delete window.location;
+window.location = {
+  href: 'http://localhost:3000',
+  pathname: '/',
+  search: '',
+  hash: '',
+  reload: jest.fn(),
+  assign: jest.fn(),
+  replace: jest.fn(),
 };
 
-// Mock Socket.IO
-global.io = jest.fn(() => ({
-  on: jest.fn(),
-  off: jest.fn(),
-  emit: jest.fn(),
-  connect: jest.fn(),
+// Mock window.matchMedia
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(), // deprecated
+    removeListener: jest.fn(), // deprecated
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
+// Mock ResizeObserver
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
   disconnect: jest.fn(),
-})); 
+}));
+
+// Mock IntersectionObserver
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
+// Mock Canvas API
+const mockContext = {
+  fillRect: jest.fn(),
+  clearRect: jest.fn(),
+  getImageData: jest.fn(() => ({
+    data: new Array(4)
+  })),
+  putImageData: jest.fn(),
+  createImageData: jest.fn(() => []),
+  setTransform: jest.fn(),
+  drawImage: jest.fn(),
+  save: jest.fn(),
+  fillText: jest.fn(),
+  restore: jest.fn(),
+  beginPath: jest.fn(),
+  moveTo: jest.fn(),
+  lineTo: jest.fn(),
+  closePath: jest.fn(),
+  stroke: jest.fn(),
+  translate: jest.fn(),
+  scale: jest.fn(),
+  rotate: jest.fn(),
+  arc: jest.fn(),
+  fill: jest.fn(),
+  measureText: jest.fn(() => ({ width: 0 })),
+  transform: jest.fn(),
+  rect: jest.fn(),
+  clip: jest.fn(),
+};
+
+// Mock HTMLCanvasElement.getContext
+HTMLCanvasElement.prototype.getContext = jest.fn((contextType) => {
+  if (contextType === '2d') {
+    return mockContext;
+  }
+  return null;
+});
+
+// Mock HTMLCanvasElement.toDataURL
+HTMLCanvasElement.prototype.toDataURL = jest.fn(() => 'data:image/png;base64,');
+
+// Mock requestAnimationFrame
+global.requestAnimationFrame = jest.fn((cb) => setTimeout(cb, 16));
+global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+
+// Mock console methods to reduce noise in tests
+global.console = {
+  ...console,
+  // Uncomment to ignore a specific log level
+  // log: jest.fn(),
+  // debug: jest.fn(),
+  // info: jest.fn(),
+  // warn: jest.fn(),
+  // error: jest.fn(),
+}; 
