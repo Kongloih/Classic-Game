@@ -1,98 +1,184 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Container,
-  Typography,
-  Grid,
   Card,
   CardContent,
+  Typography,
   Button,
-  Chip,
-  useTheme,
-  Paper,
+  Grid,
   List,
   ListItem,
-  ListItemButton,
   ListItemText,
+  ListItemButton,
   Divider,
-  Avatar,
-  Badge,
+  useTheme,
+  Alert,
+  CircularProgress
 } from '@mui/material';
-import {
-  People,
-  EmojiEvents,
-  PlayArrow,
-  Room,
-  TableRestaurant,
-  Person,
-} from '@mui/icons-material';
-import { useNavigate, useParams } from 'react-router-dom';
+import { PlayArrow } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
-import { socketService } from '../../services/socketService';
+import socketService from '../../services/socketService';
+import { useNavigate } from 'react-router-dom';
 
 const GameHallPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { gameId } = useParams();
-  const { user } = useSelector(state => state.auth);
+  const user = useSelector(state => state.auth.user);
   
-  const [selectedRoom, setSelectedRoom] = useState('room_1');
+  const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState([]);
   const [tables, setTables] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [error, setError] = useState(null);
 
-  // 游戏类型映射
-  const gameTypeMap = {
-    '1': '俄罗斯方块',
-    '2': '贪吃蛇',
-    '3': '打砖块',
-    '4': '拳皇97',
-    '5': '街头霸王2',
-  };
-
-  const gameName = gameTypeMap[gameId] || '俄罗斯方块';
-
-  // 初始化房间数据
+  // 初始化数据
   useEffect(() => {
-    const initRooms = () => {
-      const roomList = [
-        { id: 'room_1', name: '房间1', players: 0, maxPlayers: 500, status: '未满员' },
-        { id: 'room_2', name: '房间2', players: 0, maxPlayers: 500, status: '未满员' },
-        { id: 'room_3', name: '房间3', players: 0, maxPlayers: 500, status: '未满员' },
-      ];
-      setRooms(roomList);
-    };
-
-    const initTables = () => {
-      const tableList = [];
-      for (let i = 1; i <= 50; i++) {
-        tableList.push({
-          id: `table_${i}`,
-          tableId: i,
-          status: 'empty', // empty, waiting, playing, finished
-          currentPlayers: 0,
-          maxPlayers: 4,
-          seats: {
-            1: null, // 用户ID或null
-            2: null,
-            3: null,
-            4: null,
-          },
-        });
+    const initData = async () => {
+      try {
+        setLoading(true);
+        
+        // 初始化房间列表
+        await initRooms();
+        
+        // 初始化WebSocket连接
+        await initWebSocket();
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('初始化失败:', error);
+        setError('初始化失败，请刷新页面重试');
+        setLoading(false);
       }
-      setTables(tableList);
     };
 
-    initRooms();
-    initTables();
-    setLoading(false);
+    initData();
   }, []);
 
+  // 初始化房间列表
+  const initRooms = async () => {
+    try {
+      // 这里应该从API获取房间列表，暂时使用模拟数据
+      const roomList = [
+        { id: 1, room_id: 'room_1', name: '俄罗斯方块房间1', status: '未满员', online_users: 0, game_id: 1 },
+        { id: 2, room_id: 'room_2', name: '俄罗斯方块房间2', status: '未满员', online_users: 0, game_id: 1 },
+        { id: 3, room_id: 'room_3', name: '贪吃蛇房间1', status: '未满员', online_users: 0, game_id: 2 },
+        { id: 4, room_id: 'room_4', name: '贪吃蛇房间2', status: '未满员', online_users: 0, game_id: 2 },
+        { id: 5, room_id: 'room_5', name: '打砖块房间1', status: '未满员', online_users: 0, game_id: 3 },
+        { id: 6, room_id: 'room_6', name: '打砖块房间2', status: '未满员', online_users: 0, game_id: 3 },
+        { id: 7, room_id: 'room_7', name: '2048房间1', status: '未满员', online_users: 0, game_id: 4 },
+        { id: 8, room_id: 'room_8', name: '2048房间2', status: '未满员', online_users: 0, game_id: 4 },
+        { id: 9, room_id: 'room_9', name: '扫雷房间1', status: '未满员', online_users: 0, game_id: 5 },
+      ];
+      setRooms(roomList);
+      
+      // 默认选择第一个房间
+      if (roomList.length > 0) {
+        await handleRoomSelect(roomList[0].id);
+      }
+    } catch (error) {
+      console.error('获取房间列表失败:', error);
+      throw error;
+    }
+  };
+
+  // 初始化WebSocket连接
+  const initWebSocket = async () => {
+    try {
+      console.log('🔧 正在连接WebSocket...');
+      await socketService.connect();
+      console.log('✅ WebSocket连接成功');
+      
+      // 检查连接状态
+      const status = socketService.getConnectionStatus();
+      console.log('📊 WebSocket状态:', status);
+      
+    } catch (error) {
+      console.error('❌ WebSocket连接失败:', error);
+      // 不抛出错误，因为WebSocket不是必需的
+    }
+  };
+
   // 处理房间选择
-  const handleRoomSelect = (roomId) => {
-    setSelectedRoom(roomId);
-    // 这里可以加载对应房间的桌子数据
-    console.log(`选择房间: ${roomId}`);
+  const handleRoomSelect = async (roomId) => {
+    try {
+      setSelectedRoom(roomId);
+      console.log(`选择房间: ${roomId}`);
+      
+      // 从API获取该房间的桌子数据
+      await loadRoomTables(roomId);
+    } catch (error) {
+      console.error('加载房间桌子失败:', error);
+      setError('加载房间数据失败');
+    }
+  };
+
+  // 从API加载房间桌子数据
+  const loadRoomTables = async (roomId) => {
+    try {
+      setLoading(true);
+      
+      // 调用后端API获取桌子数据
+      const response = await fetch(`/api/battles/tables/${roomId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('获取桌子数据失败');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // 转换API返回的数据格式为前端需要的格式
+        const tableList = result.data.map(table => ({
+          id: table.table_id, // 使用table_id作为前端id
+          tableId: table.table_id,
+          status: table.status,
+          currentPlayers: table.current_players,
+          maxPlayers: table.max_players,
+          seats: {
+            1: table.seats[1]?.id || null,
+            2: table.seats[2]?.id || null,
+            3: table.seats[3]?.id || null,
+            4: table.seats[4]?.id || null,
+          },
+          seatUsers: {
+            1: table.seats[1],
+            2: table.seats[2],
+            3: table.seats[3],
+            4: table.seats[4],
+          }
+        }));
+        
+        setTables(tableList);
+        console.log(`✅ 加载房间 ${roomId} 的桌子数据:`, tableList);
+      } else {
+        throw new Error(result.message || '获取桌子数据失败');
+      }
+    } catch (error) {
+      console.error('获取桌子数据失败:', error);
+      // 如果API失败，使用模拟数据作为后备
+      console.log('使用模拟数据作为后备');
+      const fallbackTables = [];
+      for (let i = 1; i <= 50; i++) {
+        fallbackTables.push({
+          id: `table_${i}`,
+          tableId: i,
+          status: 'empty',
+          currentPlayers: 0,
+          maxPlayers: 4,
+          seats: { 1: null, 2: null, 3: null, 4: null },
+          seatUsers: { 1: null, 2: null, 3: null, 4: null }
+        });
+      }
+      setTables(fallbackTables);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 处理座位点击
@@ -102,7 +188,12 @@ const GameHallPage = () => {
       return;
     }
 
-    console.log(`点击桌子 ${tableId} 座位 ${seatNumber}`);
+    if (!selectedRoom) {
+      alert('请先选择房间');
+      return;
+    }
+
+    console.log(`点击桌子 ${tableId} 座位 ${seatNumber}，房间 ${selectedRoom}`);
     
     // 检查座位是否已被占用
     const table = tables.find(t => t.id === tableId);
@@ -111,9 +202,10 @@ const GameHallPage = () => {
       return;
     }
 
-    // 发送加入桌子的请求
+    // 发送加入桌子的请求，包含roomId
     socketService.emit('join_table', {
       tableId,
+      roomId: selectedRoom, // 添加roomId
       seatNumber,
       userId: user.id,
       username: user.username,
@@ -390,214 +482,174 @@ const GameHallPage = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <Typography>加载中...</Typography>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 4, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="xl">
-        {/* 头部 */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h3" component="h1" gutterBottom fontWeight={700}>
-            {gameName}游戏大厅
-          </Typography>
-          <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-            选择房间和座位，开始对战
-          </Typography>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Typography
-              variant="body2"
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                bgcolor: 'primary.main',
-                color: '#ffffff',
-                display: 'inline-block'
-              }}
-            >
-              在线玩家: {rooms.reduce((sum, room) => sum + room.players, 0)}
+      <Grid container spacing={3}>
+        {/* 左侧房间列表 */}
+        <Grid item xs={12} md={3}>
+          <Card sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              房间列表
             </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                bgcolor: 'secondary.main',
-                color: '#ffffff',
-                display: 'inline-block'
-              }}
-            >
-              可用桌子: {tables.filter(t => t.status === 'empty').length}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* 主要内容区域 */}
-        <Grid container spacing={3}>
-          {/* 左侧房间列表 */}
-          <Grid item xs={12} md={3}>
-            <Paper sx={{ p: 2, height: 'fit-content' }}>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Room />
-                房间列表
-              </Typography>
-              
-              <List sx={{ p: 0 }}>
-                {rooms.map((room, index) => (
-                  <React.Fragment key={room.id}>
-                    <ListItem disablePadding>
-                      <ListItemButton
-                        selected={selectedRoom === room.id}
-                        onClick={() => handleRoomSelect(room.id)}
-                        sx={{
-                          borderRadius: 1,
-                          mb: 1,
-                          '&.Mui-selected': {
-                            bgcolor: 'primary.main',
-                            color: 'white',
-                            '&:hover': {
-                              bgcolor: 'primary.dark',
-                            },
+            
+            <List sx={{ p: 0 }}>
+              {rooms.map((room, index) => (
+                <React.Fragment key={room.id}>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      selected={selectedRoom === room.id}
+                      onClick={() => handleRoomSelect(room.id)}
+                      sx={{
+                        borderRadius: 1,
+                        mb: 1,
+                        '&.Mui-selected': {
+                          bgcolor: 'primary.main',
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'primary.dark',
                           },
-                        }}
-                      >
-                        <ListItemText
-                          primary={room.name}
-                          secondary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  px: 1.5,
-                                  py: 0.5,
-                                  borderRadius: 1,
-                                  fontSize: '0.75rem',
-                                  fontWeight: 500,
-                                  bgcolor: 'primary.main',
-                                  color: '#ffffff',
-                                  display: 'inline-block'
-                                }}
-                              >
-                                {room.players}/{room.maxPlayers}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  px: 1.5,
-                                  py: 0.5,
-                                  borderRadius: 1,
-                                  fontSize: '0.75rem',
-                                  fontWeight: 500,
-                                  bgcolor: room.status === '未满员' ? 'success.main' : 'warning.main',
-                                  color: '#ffffff',
-                                  display: 'inline-block'
-                                }}
-                              >
-                                {room.status}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                    {index < rooms.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </Paper>
-          </Grid>
-
-          {/* 右侧桌子区域 */}
-          <Grid item xs={12} md={9}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TableRestaurant />
-                  {selectedRoom} - 对战桌面
-                </Typography>
-                
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 1,
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      bgcolor: 'primary.main',
-                      color: '#ffffff',
-                      display: 'inline-block'
-                    }}
-                  >
-                    空座位
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 1,
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      bgcolor: 'success.main',
-                      color: '#ffffff',
-                      display: 'inline-block'
-                    }}
-                  >
-                    已占用
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 1,
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      bgcolor: 'warning.main',
-                      color: '#ffffff',
-                      display: 'inline-block'
-                    }}
-                  >
-                    游戏中
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* 桌子网格 */}
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                  gap: 2,
-                  maxHeight: '70vh',
-                  overflowY: 'auto',
-                  p: 1,
-                }}
-              >
-                {tables.map((table) => renderTable(table))}
-              </Box>
-            </Paper>
-          </Grid>
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={room.name}
+                        secondary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                bgcolor: 'primary.main',
+                                color: '#ffffff',
+                                display: 'inline-block'
+                              }}
+                            >
+                              {room.online_users}/{room.maxPlayers}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                bgcolor: room.status === '未满员' ? 'success.main' : 'warning.main',
+                                color: '#ffffff',
+                                display: 'inline-block'
+                              }}
+                            >
+                              {room.status}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                  {index < rooms.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+            </List>
+          </Card>
         </Grid>
 
-        {/* 底部信息 */}
-        <Box sx={{ textAlign: 'center', mt: 4, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="body2" color="text.secondary">
-            点击座位号加入游戏，每个桌子最多支持4名玩家
-          </Typography>
-        </Box>
-      </Container>
+        {/* 右侧桌子区域 */}
+        <Grid item xs={12} md={9}>
+          <Card sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                对战桌面
+              </Typography>
+              
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 1,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    bgcolor: 'primary.main',
+                    color: '#ffffff',
+                    display: 'inline-block'
+                  }}
+                >
+                  空座位
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 1,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    bgcolor: 'success.main',
+                    color: '#ffffff',
+                    display: 'inline-block'
+                  }}
+                >
+                  已占用
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 1,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    bgcolor: 'warning.main',
+                    color: '#ffffff',
+                    display: 'inline-block'
+                  }}
+                >
+                  游戏中
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* 桌子网格 */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: 2,
+                maxHeight: '70vh',
+                overflowY: 'auto',
+                p: 1,
+              }}
+            >
+              {tables.map((table) => renderTable(table))}
+            </Box>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* 底部信息 */}
+      <Box sx={{ textAlign: 'center', mt: 4, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="body2" color="text.secondary">
+          点击座位号加入游戏，每个桌子最多支持4名玩家
+        </Typography>
+      </Box>
     </Box>
   );
 };

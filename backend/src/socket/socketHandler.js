@@ -226,6 +226,139 @@ const socketHandler = (io) => {
       }
     });
 
+    // 处理加入桌子
+    socket.on('join_table', async (data) => {
+      const { tableId, roomId, seatNumber, userId, username } = data;
+      
+      try {
+        console.log(`🔧 用户 ${socket.username} 尝试加入桌子 ${tableId} 座位 ${seatNumber}，房间 ${roomId}`);
+        
+        // 导入必要的模型和服务
+        const BattleTable = require('../models/BattleTable');
+        const BattleService = require('../services/battleService');
+        
+        // 查找桌子，同时检查table_id和room_id
+        const table = await BattleTable.findOne({
+          where: { 
+            table_id: tableId,
+            room_id: roomId
+          }
+        });
+        
+        if (!table) {
+          console.log(`❌ 桌子 ${tableId} 在房间 ${roomId} 中不存在`);
+          socket.emit('join_table_failed', {
+            tableId,
+            seatNumber,
+            message: '桌子不存在'
+          });
+          return;
+        }
+        
+        // 检查座位是否已被占用
+        const seatField = `seat_${seatNumber}_user_id`;
+        if (table[seatField]) {
+          console.log(`❌ 座位 ${seatNumber} 已被占用`);
+          socket.emit('join_table_failed', {
+            tableId,
+            seatNumber,
+            message: '座位已被占用'
+          });
+          return;
+        }
+        
+        // 检查用户是否已在其他座位
+        const existingSeat = await BattleService.getUserSeat(userId, table.id);
+        if (existingSeat) {
+          console.log(`❌ 用户已在座位 ${existingSeat}`);
+          socket.emit('join_table_failed', {
+            tableId,
+            seatNumber,
+            message: '您已在其他座位'
+          });
+          return;
+        }
+        
+        // 加入座位
+        await BattleService.userJoinTable(userId, table.id, seatNumber);
+        
+        console.log(`✅ 用户 ${socket.username} 成功加入桌子 ${tableId} 座位 ${seatNumber}`);
+        
+        // 发送成功响应
+        socket.emit('join_table_success', {
+          tableId,
+          seatNumber,
+          userId,
+          username
+        });
+        
+        // 广播给其他用户
+        socket.broadcast.emit('player_joined_table', {
+          tableId,
+          seatNumber,
+          userId,
+          username
+        });
+        
+      } catch (error) {
+        console.error('❌ 加入桌子失败:', error);
+        socket.emit('join_table_failed', {
+          tableId,
+          seatNumber,
+          message: error.message || '加入桌子失败'
+        });
+      }
+    });
+
+    // 处理离开桌子
+    socket.on('leave_table', async (data) => {
+      const { tableId, roomId, userId } = data;
+      
+      try {
+        console.log(`🔧 用户 ${socket.username} 尝试离开桌子 ${tableId}，房间 ${roomId}`);
+        
+        // 导入必要的模型和服务
+        const BattleTable = require('../models/BattleTable');
+        const BattleService = require('../services/battleService');
+        
+        // 查找桌子，同时检查table_id和room_id
+        const table = await BattleTable.findOne({
+          where: { 
+            table_id: tableId,
+            room_id: roomId
+          }
+        });
+        
+        if (!table) {
+          console.log(`❌ 桌子 ${tableId} 在房间 ${roomId} 中不存在`);
+          return;
+        }
+        
+        // 获取用户当前座位
+        const seatNumber = await BattleService.getUserSeat(userId, table.id);
+        if (!seatNumber) {
+          console.log(`❌ 用户不在该桌子中`);
+          return;
+        }
+        
+        // 离开座位
+        await BattleService.userLeaveTable(userId, table.id, seatNumber);
+        
+        console.log(`✅ 用户 ${socket.username} 成功离开桌子 ${tableId} 座位 ${seatNumber}`);
+        
+        // 广播给其他用户
+        socket.broadcast.emit('player_left_table', {
+          tableId,
+          seatNumber,
+          userId,
+          username: socket.username
+        });
+        
+      } catch (error) {
+        console.error('❌ 离开桌子失败:', error);
+      }
+    });
+
     // 处理游戏开始
     socket.on('start_game', async (data) => {
       const { roomId } = data;
