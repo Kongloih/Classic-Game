@@ -154,11 +154,21 @@ const GamePlayPage = () => {
               <Typography variant="h6" fontWeight={600}>
                 {currentGame.name}
               </Typography>
-              <Chip
-                label={`等级 ${level}`}
-                color="primary"
-                size="small"
-              />
+              <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'primary.main',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -299,11 +309,21 @@ const GamePlayPage = () => {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2">状态:</Typography>
-                        <Chip
-                          label={gameState === 'playing' ? '进行中' : gameState === 'paused' ? '暂停' : '结束'}
-                          color={gameState === 'playing' ? 'success' : gameState === 'paused' ? 'warning' : 'error'}
-                          size="small"
-                        />
+                        <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2">分数:</Typography>

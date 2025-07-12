@@ -86,18 +86,6 @@ const LoginPage = () => {
     }
   };
 
-  const handleDemoLogin = async () => {
-    try {
-      await dispatch(login({
-        identifier: 'demo@example.com',
-        password: 'demo123'
-      })).unwrap();
-      navigate(from, { replace: true });
-    } catch (error) {
-      console.error('演示登录失败:', error);
-    }
-  };
-
   return (
     <Box 
       sx={{ 
@@ -200,17 +188,6 @@ const LoginPage = () => {
                 }}
               >
                 {loading ? '登录中...' : '登录'}
-              </Button>
-
-              <Button
-                fullWidth
-                variant="outlined"
-                size="large"
-                onClick={handleDemoLogin}
-                disabled={loading}
-                sx={{ mb: 2 }}
-              >
-                演示登录
               </Button>
             </Box>
 

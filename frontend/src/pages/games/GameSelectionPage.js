@@ -130,14 +130,40 @@ const GameSelectionPage = () => {
           </Typography>
           
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Chip
-              icon={<People />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label={`在线玩家: ${games.reduce((sum, game) => sum + game.onlinePlayers, 0)}`}
               color="primary"
               variant="outlined"
             />
-            <Chip
-              icon={<TrendingUp />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label={`今日游戏: ${games.reduce((sum, game) => sum + game.playCount, 0)}`}
               color="secondary"
               variant="outlined"
@@ -195,22 +221,51 @@ const GameSelectionPage = () => {
 
                   {/* 游戏标签 */}
                   <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-                    <Chip
-                      label={game.players}
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                    />
-                    <Chip
-                      label={game.difficulty}
-                      size="small"
-                      color={getDifficultyColor(game.difficulty)}
-                    />
-                    <Chip
-                      label={game.category}
-                      size="small"
-                      color={getCategoryColor(game.category)}
-                    />
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'primary.main',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
                   </Box>
 
                   {/* 统计信息 */}

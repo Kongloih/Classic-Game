@@ -1,128 +1,193 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
+const BattleService = require('../services/battleService');
+const UserStatus = require('../models/UserStatus');
 
-// 获取对战房间列表
-router.get('/rooms', authMiddleware, async (req, res) => {
+// 获取游戏的所有房间
+router.get('/rooms/:gameId', authMiddleware, async (req, res) => {
   try {
-    const rooms = [
-      {
-        id: 1,
-        name: '俄罗斯方块对战房',
-        game: '俄罗斯方块',
-        players: 2,
-        maxPlayers: 4,
-        status: 'waiting',
-        createdBy: '用户1'
-      },
-      {
-        id: 2,
-        name: '贪吃蛇竞技场',
-        game: '贪吃蛇',
-        players: 3,
-        maxPlayers: 6,
-        status: 'playing',
-        createdBy: '用户2'
-      }
-    ];
+    const { gameId } = req.params;
+    const rooms = await BattleService.getGameRooms(gameId);
     
     res.json({
       success: true,
       data: rooms
     });
   } catch (error) {
+    console.error('获取游戏房间失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取对战房间失败'
+      message: '获取房间列表失败'
     });
   }
 });
 
-// 创建对战房间
-router.post('/rooms', authMiddleware, async (req, res) => {
-  try {
-    const { name, game, maxPlayers } = req.body;
-    
-    const room = {
-      id: Date.now(),
-      name: name,
-      game: game,
-      players: 1,
-      maxPlayers: maxPlayers || 4,
-      status: 'waiting',
-      createdBy: req.user.username,
-      createdAt: new Date().toISOString()
-    };
-    
-    res.json({
-      success: true,
-      data: room,
-      message: '房间创建成功'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: '创建房间失败'
-    });
-  }
-});
-
-// 加入对战房间
-router.post('/rooms/:roomId/join', authMiddleware, async (req, res) => {
+// 获取房间内的所有桌子
+router.get('/tables/:roomId', authMiddleware, async (req, res) => {
   try {
     const { roomId } = req.params;
+    const tables = await BattleService.getRoomTables(roomId);
     
     res.json({
       success: true,
-      message: '成功加入房间'
+      data: tables
     });
   } catch (error) {
+    console.error('获取房间桌子失败:', error);
     res.status(500).json({
       success: false,
-      message: '加入房间失败'
+      message: '获取桌子列表失败'
     });
   }
 });
 
-// 获取房间详情
-router.get('/rooms/:roomId', authMiddleware, async (req, res) => {
+// 用户进入房间
+router.post('/rooms/:roomId/enter', authMiddleware, async (req, res) => {
   try {
     const { roomId } = req.params;
+    const userId = req.user.id;
     
-    const room = {
-      id: roomId,
-      name: '俄罗斯方块对战房',
-      game: '俄罗斯方块',
-      players: [
-        {
-          id: 1,
-          username: '玩家1',
-          ready: true,
-          score: 0
-        },
-        {
-          id: 2,
-          username: '玩家2',
-          ready: false,
-          score: 0
-        }
-      ],
-      maxPlayers: 4,
-      status: 'waiting',
-      gameSettings: {
-        difficulty: 'normal',
-        timeLimit: 300
-      }
-    };
+    const result = await BattleService.userEnterRoom(userId, roomId);
     
     res.json({
       success: true,
-      data: room
+      data: result,
+      message: '成功进入房间'
     });
   } catch (error) {
+    console.error('进入房间失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取房间详情失败'
+      message: error.message || '进入房间失败'
+    });
+  }
+});
+
+// 用户离开房间
+router.post('/rooms/:roomId/leave', authMiddleware, async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+    
+    const result = await BattleService.userLeaveRoom(userId, roomId);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: '成功离开房间'
+    });
+  } catch (error) {
+    console.error('离开房间失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '离开房间失败'
+    });
+  }
+});
+
+// 用户加入桌子座位
+router.post('/tables/:tableId/join', authMiddleware, async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    const { seatNumber } = req.body;
+    const userId = req.user.id;
+    
+    if (!seatNumber || seatNumber < 1 || seatNumber > 4) {
+      return res.status(400).json({
+        success: false,
+        message: '座位号无效'
+      });
+    }
+    
+    const result = await BattleService.userJoinTable(userId, tableId, seatNumber);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: '成功加入座位'
+    });
+  } catch (error) {
+    console.error('加入座位失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '加入座位失败'
+    });
+  }
+});
+
+// 用户离开桌子座位
+router.post('/tables/:tableId/leave', authMiddleware, async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    const userId = req.user.id;
+    
+    // 获取用户当前座位
+    const seatNumber = await BattleService.getUserSeat(userId, tableId);
+    if (!seatNumber) {
+      return res.status(400).json({
+        success: false,
+        message: '用户不在该桌子中'
+      });
+    }
+    
+    const result = await BattleService.userLeaveTable(userId, tableId, seatNumber);
+    
+    res.json({
+      success: true,
+      data: result,
+      message: '成功离开座位'
+    });
+  } catch (error) {
+    console.error('离开座位失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '离开座位失败'
+    });
+  }
+});
+
+// 开始游戏
+router.post('/tables/:tableId/start', authMiddleware, async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    const userId = req.user.id;
+    
+    // TODO: 实现开始游戏逻辑
+    // 检查所有玩家是否准备就绪
+    // 设置游戏状态为playing
+    // 分配游戏房间等
+    
+    res.json({
+      success: true,
+      message: '游戏开始'
+    });
+  } catch (error) {
+    console.error('开始游戏失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '开始游戏失败'
+    });
+  }
+});
+
+// 获取用户状态
+router.get('/user/status', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userStatus = await UserStatus.findOne({
+      where: { user_id: userId }
+    });
+    
+    res.json({
+      success: true,
+      data: userStatus
+    });
+  } catch (error) {
+    console.error('获取用户状态失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取用户状态失败'
     });
   }
 });

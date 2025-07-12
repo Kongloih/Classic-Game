@@ -37,6 +37,7 @@ const userRoutes = require('./routes/user');
 const gameRoutes = require('./routes/game');
 const socialRoutes = require('./routes/social');
 const battleRoutes = require('./routes/battle');
+const gameHallRoutes = require('./routes/gameHall');
 
 // 导入Socket.IO处理器
 const socketHandler = require('./socket/socketHandler');
@@ -44,6 +45,9 @@ const socketHandler = require('./socket/socketHandler');
 // 导入数据库连接
 const { sequelize, testConnection } = require('./config/database');
 const { connectRedis } = require('./config/redis');
+
+// 导入清理服务
+const CleanupService = require('./services/cleanupService');
 
 // 导入中间件
 const { errorHandler } = require('./middleware/errorHandler');
@@ -138,6 +142,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/battles', battleRoutes);
+app.use('/api/games/hall', gameHallRoutes);
 
 // API文档
 if (process.env.NODE_ENV !== 'production') {
@@ -199,6 +204,9 @@ const startServer = async () => {
         console.log(`📱 前端开发服务器: http://localhost:3000`);
         console.log(`🔧 后端API服务器: http://localhost:${PORT}`);
       }
+      
+      // 启动定时清理任务
+      CleanupService.startCleanupTasks();
     });
 
     // 优雅关闭处理

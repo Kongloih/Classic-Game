@@ -68,19 +68,19 @@ const BattlePage = () => {
   const handleModeSelect = (modeId) => {
     switch (modeId) {
       case 'quick':
-        navigate('/games');
+        navigate('/battle/hall/1'); // 进入俄罗斯方块游戏大厅
         break;
       case 'ranked':
-        navigate('/games');
+        navigate('/battle/hall/1'); // 进入俄罗斯方块游戏大厅
         break;
       case 'friendly':
-        navigate('/games');
+        navigate('/battle/hall/1'); // 进入俄罗斯方块游戏大厅
         break;
       case 'tournament':
-        navigate('/games');
+        navigate('/battle/hall/1'); // 进入俄罗斯方块游戏大厅
         break;
       default:
-        navigate('/games');
+        navigate('/battle/hall/1'); // 默认进入俄罗斯方块游戏大厅
     }
   };
 
@@ -97,14 +97,40 @@ const BattlePage = () => {
           </Typography>
           
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Chip
-              icon={<People />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label="在线玩家: 1,234"
               color="primary"
               variant="outlined"
             />
-            <Chip
-              icon={<TrendingUp />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label="今日对战: 5,678"
               color="secondary"
               variant="outlined"
@@ -161,23 +187,51 @@ const BattlePage = () => {
 
                   {/* 模式信息 */}
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
-                    <Chip
-                      label={mode.players}
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                    />
-                    <Chip
-                      label={mode.timeLimit}
-                      size="small"
-                      variant="outlined"
-                      color="secondary"
-                    />
-                    <Chip
-                      label={mode.difficulty}
-                      size="small"
-                      color={mode.difficulty === '困难' ? 'error' : mode.difficulty === '中等' ? 'warning' : 'success'}
-                    />
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'primary.main',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'secondary.main',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
+                    <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
                   </Box>
 
                   {/* 开始按钮 */}

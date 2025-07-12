@@ -7,14 +7,12 @@ import {
   Card,
   CardContent,
   Button,
-  Chip,
   Avatar,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  useTheme,
-} from '@mui/material';
+  useTheme} from '@mui/material';
 import {
   People,
   EmojiEvents,
@@ -23,11 +21,11 @@ import {
   Sort,
   Refresh,
   PlayArrow,
-  Visibility,
-} from '@mui/icons-material';
+  Visibility} from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { gameApi } from '../../services/api';
+import { offlineGameApi } from '../../services/offlineApi';
 
 const GameHallPage = () => {
   const theme = useTheme();
@@ -59,12 +57,13 @@ const GameHallPage = () => {
                           window.location.pathname.includes('/test/') ||
                           window.location.search.includes('testMode=true');
         
-        const response = await gameApi.getGameHall(gameId, isTestMode);
+        // 使用离线API，如果后端未启动会自动使用模拟数据
+        const response = await offlineGameApi.getGameHall(gameId, isTestMode);
         
         if (response.success) {
           setGameInfo(response.data.game);
-          setGameTables(response.data.gameTables);
-          setStats(response.data.stats);
+          setGameTables(response.data.gameTables || []);
+          setStats(response.data.stats || { onlineUsers: 0, activeRooms: 0, maxScore: 0 });
         }
       } catch (error) {
         console.error('获取游戏大厅数据失败:', error);
@@ -159,24 +158,57 @@ const GameHallPage = () => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Chip
-              icon={<People />}
-              label={`在线玩家: ${stats.onlineUsers}`}
-              color="primary"
-              variant="outlined"
-            />
-            <Chip
-              icon={<EmojiEvents />}
-              label={`活跃房间: ${stats.activeRooms}`}
-              color="secondary"
-              variant="outlined"
-            />
-            <Chip
-              icon={<Star />}
-              label={`最高分: ${stats.maxScore}`}
-              color="success"
-              variant="outlined"
-            />
+            <Typography
+              variant="body2"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                fontWeight: 500
+              }}
+            >
+              <People />
+              在线玩家: {stats.onlineUsers}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+                bgcolor: 'secondary.main',
+                color: 'secondary.contrastText',
+                fontWeight: 500
+              }}
+            >
+              <EmojiEvents />
+              活跃房间: {stats.activeRooms}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                borderRadius: 2,
+                bgcolor: '#2ecc71',
+                color: '#ffffff',
+                fontWeight: 500
+              }}
+            >
+              <Star />
+              最高分: {stats.maxScore}
+            </Typography>
           </Box>
         </Box>
 
@@ -237,9 +269,7 @@ const GameHallPage = () => {
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: theme.shadows[8],
-                    borderColor: 'primary.main',
-                  },
-                }}
+                    borderColor: 'primary.main'}}}
                 onClick={() => handleTableClick(table)}
               >
                 <CardContent sx={{ p: 2 }}>
@@ -248,11 +278,25 @@ const GameHallPage = () => {
                     <Typography variant="h6" fontWeight={600}>
                       游戏桌 #{table.id}
                     </Typography>
-                    <Chip
-                      label={getStatusText(table.status)}
-                      color={getStatusColor(table.status)}
-                      size="small"
-                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1,
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        bgcolor: getStatusColor(table.status) === 'success' ? '#2ecc71' :
+                                 getStatusColor(table.status) === 'warning' ? '#f39c12' :
+                                 getStatusColor(table.status) === 'error' ? '#e74c3c' :
+                                 getStatusColor(table.status) === 'info' ? '#3498db' :
+                                 getStatusColor(table.status) === 'primary' ? 'primary.main' :
+                                 getStatusColor(table.status) === 'secondary' ? 'secondary.main' : 'grey.500',
+                        color: '#ffffff'
+                      }}
+                    >
+                      {getStatusText(table.status)}
+                    </Typography>
                   </Box>
 
                   {/* 玩家列表 */}

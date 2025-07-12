@@ -58,51 +58,14 @@ const BattleRoomPage = () => {
       try {
         setLoading(true);
         
-        // 检查是否为测试模式（通过URL路径判断）
-        const isTestMode = window.location.pathname.includes('/test/') || 
-                          !localStorage.getItem('token');
-        
-        // 连接WebSocket
-        await socketService.connect(isTestMode);
+        // 连接WebSocket（强制要求认证）
+        await socketService.connect();
         
         // 加入游戏房间
         socketService.emit('join_game_room', {
           roomId,
           gameType: gameTypeMap[gameId] || '俄罗斯方块'
         });
-
-        // 如果是测试模式，创建模拟房间数据
-        if (isTestMode) {
-          setTimeout(() => {
-            const mockRoomData = {
-              id: roomId,
-              gameType: gameTypeMap[gameId] || '俄罗斯方块',
-              gameId: gameId,
-              players: [
-                {
-                  id: 'test_user_1',
-                  username: '测试玩家',
-                  avatar: null,
-                  level: 1,
-                  score: 0,
-                  isReady: true,
-                  isHost: true,
-                }
-              ],
-              maxPlayers: 2,
-              status: 'waiting',
-              createdAt: new Date(),
-              settings: {
-                difficulty: 'normal',
-                timeLimit: 300,
-                rounds: 3,
-              },
-            };
-            setRoomData(mockRoomData);
-            setGameState('waiting');
-            setLoading(false);
-          }, 1000); // 模拟网络延迟
-        }
 
         // 监听房间信息
         socketService.on('room_info', (data) => {
@@ -158,13 +121,18 @@ const BattleRoomPage = () => {
 
         // 监听玩家准备状态
         socketService.on('player_ready_status', (data) => {
+          console.log('🔧 收到准备状态更新:', data);
           setRoomData(prev => {
             if (!prev) return prev;
-            const newPlayers = prev.players.map(player =>
-              player.id === data.playerId
-                ? { ...player, isReady: data.isReady }
-                : player
-            );
+            
+            const newPlayers = prev.players.map(player => {
+              if (player.id === data.playerId) {
+                console.log(`✅ 更新玩家 ${player.username} 的准备状态: ${data.isReady}`);
+                return { ...player, isReady: data.isReady };
+              }
+              return player;
+            });
+            
             return { ...prev, players: newPlayers };
           });
         });
@@ -233,13 +201,21 @@ const BattleRoomPage = () => {
 
   const handleReady = () => {
     if (roomData) {
+      // 使用真实用户ID匹配
       const currentPlayer = roomData.players.find(p => p.id === user?.id);
-      const newReadyState = !currentPlayer?.isReady;
       
-      socketService.emit('player_ready', {
-        roomId,
-        isReady: newReadyState
-      });
+      if (currentPlayer) {
+        const newReadyState = !currentPlayer.isReady;
+        
+        console.log(`🔧 准备状态切换: ${currentPlayer.username} ${newReadyState ? '准备' : '取消准备'}`);
+        
+        socketService.emit('player_ready', {
+          roomId,
+          isReady: newReadyState
+        });
+      } else {
+        console.warn('⚠️ 未找到当前玩家信息');
+      }
     }
   };
 
@@ -312,20 +288,59 @@ const BattleRoomPage = () => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Chip
-              icon={<People />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label={`玩家: ${roomData.players.length}/${roomData.maxPlayers}`}
               color="primary"
               variant="outlined"
             />
-            <Chip
-              icon={<EmojiEvents />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label={roomData.gameType}
               color="secondary"
               variant="outlined"
             />
-            <Chip
-              icon={<Star />}
+            <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>}
               label={`最高分: ${Math.max(...roomData.players.map(p => p.score))}`}
               color="success"
               variant="outlined"
@@ -379,23 +394,42 @@ const BattleRoomPage = () => {
                       <Typography variant="h6" fontWeight={600}>
                         {player.username}
                         {player.isHost && (
-                          <Chip
-                            label="房主"
-                            size="small"
-                            color="primary"
-                            sx={{ ml: 1 }}
-                          />
+                          <Typography
+            variant="caption"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              bgcolor: 'primary.main',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            房主
+          </Typography>
                         )}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         等级 {player.level} • 分数 {player.score}
                       </Typography>
                     </Box>
-                    <Chip
-                      label={player.isReady ? '已准备' : '未准备'}
-                      color={player.isReady ? 'success' : 'default'}
-                      variant={player.isReady ? 'filled' : 'outlined'}
-                    />
+                    <Typography
+            variant="body2"
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              bgcolor: 'grey.500',
+              color: '#ffffff',
+              display: 'inline-block'
+            }}
+          >
+            
+          </Typography>
                   </Box>
 
                   {/* 玩家统计 */}

@@ -11,7 +11,10 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "db:init": "node scripts/init-database.js",
+    "db:reset": "node scripts/init-database.js --reset",
+    "battle:init": "node scripts/init-battle-system.js"
   },
   "keywords": [
     "game",
@@ -40,6 +43,7 @@
     "redis": "^4.6.7",
     "sequelize": "^6.32.1",
     "socket.io": "^4.7.2",
+    "socket.io-client": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0"
   },

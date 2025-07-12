@@ -26,10 +26,12 @@ import FriendsPage from './pages/social/FriendsPage';
 import GuildPage from './pages/social/GuildPage';
 import BattlePage from './pages/battle/BattlePage';
 import BattleRoomPage from './pages/battle/BattleRoomPage';
+import BattleGameHallPage from './pages/battle/GameHallPage';
 import TetrisTestPage from './pages/test/TetrisTestPage';
 import GameTestPage from './pages/test/GameTestPage';
 import SimpleGameTestPage from './pages/test/SimpleGameTestPage';
 import NotFoundPage from './pages/NotFoundPage';
+import GameHallTestPage from './pages/test/GameHallTestPage';
 
 // Redux actions
 import { checkAuthStatus, clearUser } from './store/slices/authSlice';
@@ -179,7 +181,7 @@ function App() {
                   {/* 游戏相关路由 */}
                   <Route path="/games" element={<GameSelectionPage />} />
                   <Route path="/games/:gameId" element={<GameDetailPage />} />
-                  <Route path="/games/:gameId/hall" element={<GameHallPage />} />
+                  <Route path="/games/:gameId/hall" element={<BattleGameHallPage />} />
                   <Route path="/play/:gameId" element={
                     <ProtectedRoute>
                       <GamePlayPage />
@@ -216,6 +218,11 @@ function App() {
                       <BattlePage />
                     </ProtectedRoute>
                   } />
+                  <Route path="/battle/hall/:gameId" element={
+                    <ProtectedRoute>
+                      <BattleGameHallPage />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/battle/room/:gameId/:roomId" element={
                     <ProtectedRoute>
                       <BattleRoomPage />
@@ -226,6 +233,7 @@ function App() {
                   <Route path="/test/tetris" element={<TetrisTestPage />} />
                   <Route path="/test/games" element={<GameTestPage />} />
                   <Route path="/test/simple" element={<SimpleGameTestPage />} />
+                  <Route path="/test/hall" element={<GameHallTestPage />} />
                   
                   {/* 排行榜 */}
                   <Route path="/leaderboard" element={<LeaderboardPage />} />
