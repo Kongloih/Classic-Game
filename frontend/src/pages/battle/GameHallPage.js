@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import { PlayArrow } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
-import socketService from '../../services/socketService';
+import { socketService } from '../../services/socketService';
 import { useNavigate } from 'react-router-dom';
 
 const GameHallPage = () => {
