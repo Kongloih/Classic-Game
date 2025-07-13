@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography, Button, Grid, Paper, Alert, Chip } from '@mui/material';
-import { useSelector } from 'react-redux';
 
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
@@ -14,16 +13,16 @@ const BRICK_HEIGHT = 30;
 const BRICK_PADDING = 2;
 
 const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
-  const { user } = useSelector(state => state.auth);
+  const [gameState, setGameState] = useState('waiting'); // waiting, playing, paused, gameOver
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [level, setLevel] = useState(1);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [bricks, setBricks] = useState([]);
+  const [keys, setKeys] = useState({});
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
-  
-  const [gameStatus, setGameStatus] = useState('waiting'); // waiting, playing, paused, gameOver
-  const [score, setScore] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [lives, setLives] = useState(3);
-  const [isReady, setIsReady] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
   
   // 游戏对象状态
   const [paddle, setPaddle] = useState({
@@ -43,9 +42,6 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     speed: 4
   });
   
-  const [bricks, setBricks] = useState([]);
-  const [keys, setKeys] = useState({});
-
   // 初始化砖块
   const initializeBricks = useCallback(() => {
     const newBricks = [];
@@ -129,31 +125,23 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
   }, [drawGame]);
 
   // 检查碰撞
-  const checkCollision = useCallback((rect1, rect2) => {
-    return rect1.x < rect2.x + rect2.width &&
-           rect1.x + rect1.width > rect2.x &&
-           rect1.y < rect2.y + rect2.height &&
-           rect1.y + rect1.height > rect2.y;
+  const checkCollision = useCallback((ball, paddle) => {
+    return ball.x + ball.radius > paddle.x && 
+           ball.x - ball.radius < paddle.x + paddle.width &&
+           ball.y + ball.radius > paddle.y && 
+           ball.y - ball.radius < paddle.y + paddle.height;
   }, []);
 
-  // 检查球与砖块的碰撞
-  const checkBallBrickCollision = useCallback((ball, brick) => {
-    if (!brick.visible) return false;
-    
-    const ballLeft = ball.x - ball.radius;
-    const ballRight = ball.x + ball.radius;
-    const ballTop = ball.y - ball.radius;
-    const ballBottom = ball.y + ball.radius;
-    
-    return ballLeft < brick.x + brick.width &&
-           ballRight > brick.x &&
-           ballTop < brick.y + brick.height &&
-           ballBottom > brick.y;
+  const checkBrickCollision = useCallback((ball, brick) => {
+    return ball.x + ball.radius > brick.x && 
+           ball.x - ball.radius < brick.x + brick.width &&
+           ball.y + ball.radius > brick.y && 
+           ball.y - ball.radius < brick.y + brick.height;
   }, []);
 
   // 更新游戏状态
   const updateGame = useCallback(() => {
-    if (gameStatus !== 'playing') return;
+    if (gameState !== 'playing') return;
 
     setBall(prevBall => {
       let newBall = { ...prevBall };
@@ -175,7 +163,7 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         setLives(prev => {
           const newLives = prev - 1;
           if (newLives <= 0) {
-            setGameStatus('gameOver');
+            setGameState('gameOver');
             onGameOver && onGameOver(score);
           } else {
             // 重置球的位置
@@ -215,14 +203,7 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         height: paddle.height
       };
       
-      const ballRect = {
-        x: newBall.x - newBall.radius,
-        y: newBall.y - newBall.radius,
-        width: newBall.radius * 2,
-        height: newBall.radius * 2
-      };
-      
-      if (checkCollision(ballRect, paddleRect)) {
+      if (checkCollision(newBall, paddleRect)) {
         newBall.dy = -Math.abs(newBall.dy);
         
         // 根据击中球拍的位置调整球的方向
@@ -236,12 +217,10 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     // 砖块碰撞检测
     setBricks(prevBricks => {
       const newBricks = [...prevBricks];
-      let bricksHit = 0;
       
       newBricks.forEach(brick => {
-        if (checkBallBrickCollision(ball, brick)) {
+        if (checkBrickCollision(ball, brick)) {
           brick.visible = false;
-          bricksHit++;
           
           // 增加分数
           setScore(prev => {
@@ -270,18 +249,18 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       
       return newBricks;
     });
-  }, [gameStatus, paddle, ball, bricks, keys, score, level, checkCollision, checkBallBrickCollision, initializeBricks, onGameOver, onScoreUpdate]);
+  }, [gameState, paddle, ball, keys, score, level, checkCollision, checkBrickCollision, initializeBricks, onGameOver, onScoreUpdate]);
 
   // 游戏循环
   useEffect(() => {
-    if (gameStatus === 'playing') {
+    if (gameState === 'playing') {
       const gameLoop = () => {
         updateGame();
         drawGame();
         animationRef.current = requestAnimationFrame(gameLoop);
       };
       gameLoop();
-    } else if (gameStatus === 'paused' || gameStatus === 'waiting') {
+    } else if (gameState === 'paused' || gameState === 'waiting') {
       // 在暂停或等待状态下也要绘制游戏
       drawGame();
     }
@@ -291,7 +270,7 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [gameStatus, updateGame, drawGame]);
+  }, [gameState, updateGame, drawGame]);
 
   // 键盘事件处理
   useEffect(() => {
@@ -300,10 +279,10 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       
       if (event.key === ' ') {
         event.preventDefault();
-        if (gameStatus === 'playing') {
-          setGameStatus('paused');
-        } else if (gameStatus === 'paused') {
-          setGameStatus('playing');
+        if (gameState === 'playing') {
+          setGameState('paused');
+        } else if (gameState === 'paused') {
+          setGameState('playing');
         }
       }
     };
@@ -319,7 +298,7 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameStatus]);
+  }, [gameState]);
 
 
 
@@ -330,18 +309,18 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
   // 开始游戏
   const startGame = () => {
-    setGameStatus('playing');
+    setGameState('playing');
     setGameStarted(true);
     setBricks(initializeBricks());
     
     // 注册全局暂停/继续回调
-    window.gamePauseCallback = () => setGameStatus('paused');
-    window.gameResumeCallback = () => setGameStatus('playing');
+    window.gamePauseCallback = () => setGameState('paused');
+    window.gameResumeCallback = () => setGameState('playing');
   };
 
   // 重新开始游戏
   const restartGame = () => {
-    setGameStatus('playing');
+    setGameState('playing');
     setScore(0);
     setLevel(1);
     setLives(3);
@@ -383,11 +362,11 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
             {/* 游戏状态 */}
             <Box sx={{ mb: 3 }}>
               <Chip
-                label={gameStatus === 'waiting' ? '等待开始' : 
-                       gameStatus === 'playing' ? '游戏中' : 
-                       gameStatus === 'paused' ? '已暂停' : '游戏结束'}
-                color={gameStatus === 'playing' ? 'success' : 
-                       gameStatus === 'gameOver' ? 'error' : 'default'}
+                label={gameState === 'waiting' ? '等待开始' : 
+                       gameState === 'playing' ? '游戏中' : 
+                       gameState === 'paused' ? '已暂停' : '游戏结束'}
+                color={gameState === 'playing' ? 'success' : 
+                       gameState === 'gameOver' ? 'error' : 'default'}
                 sx={{ mb: 2 }}
               />
               
@@ -426,7 +405,7 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
                 </>
               ) : (
                 <>
-                  {gameStatus === 'gameOver' && (
+                  {gameState === 'gameOver' && (
                     <Button
                       variant="contained"
                       onClick={restartGame}
@@ -435,10 +414,10 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
                       重新开始
                     </Button>
                   )}
-                  {gameStatus === 'paused' && (
+                  {gameState === 'paused' && (
                     <Button
                       variant="contained"
-                      onClick={() => setGameStatus('playing')}
+                      onClick={() => setGameState('playing')}
                       fullWidth
                     >
                       继续游戏
@@ -467,13 +446,13 @@ const BreakoutGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         {/* 游戏画布 */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, textAlign: 'center' }}>
-            {gameStatus === 'gameOver' && (
+            {gameState === 'gameOver' && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 游戏结束！最终分数: {score}
               </Alert>
             )}
             
-            {gameStatus === 'paused' && (
+            {gameState === 'paused' && (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 游戏已暂停
               </Alert>

@@ -1,47 +1,36 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Typography, Button, Grid, Paper, Alert, Chip } from '@mui/material';
-import { useSelector } from 'react-redux';
+import { Box, Typography, Button, Grid, Paper, Alert } from '@mui/material';
 
-const BOARD_SIZE = 20;
-const INITIAL_SNAKE = [
-  { x: 10, y: 10 },
-  { x: 9, y: 10 },
-  { x: 8, y: 10 }
-];
-const INITIAL_DIRECTION = { x: 1, y: 0 };
-const INITIAL_SPEED = 200;
+const GRID_SIZE = 20;
 
 const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
-  const { user } = useSelector(state => state.auth);
-  const [snake, setSnake] = useState(INITIAL_SNAKE);
-  const [direction, setDirection] = useState(INITIAL_DIRECTION);
-  const [food, setFood] = useState({ x: 15, y: 15 });
-  const [gameStatus, setGameStatus] = useState('waiting'); // waiting, playing, paused, gameOver
+  const [gameState, setGameState] = useState('waiting'); // waiting, playing, paused, gameOver
   const [score, setScore] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [speed, setSpeed] = useState(INITIAL_SPEED);
-  const [isReady, setIsReady] = useState(false);
+  const [snake, setSnake] = useState([{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }]);
+  const [food, setFood] = useState({ x: 15, y: 15 });
+  const [direction, setDirection] = useState({ x: 1, y: 0 });
   const [gameStarted, setGameStarted] = useState(false);
-  
-  const gameRef = useRef(null);
+  const [isReady, setIsReady] = useState(false);
+  const canvasRef = useRef(null);
   const gameLoopRef = useRef(null);
 
   // 生成随机食物位置
   const generateFood = useCallback(() => {
+    const snakePositions = new Set(snake.map(segment => `${segment.x},${segment.y}`));
     let newFood;
     do {
       newFood = {
-        x: Math.floor(Math.random() * BOARD_SIZE),
-        y: Math.floor(Math.random() * BOARD_SIZE)
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE)
       };
-    } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+    } while (snakePositions.has(`${newFood.x},${newFood.y}`));
     return newFood;
   }, [snake]);
 
   // 检查碰撞
   const checkCollision = useCallback((head) => {
     // 检查墙壁碰撞
-    if (head.x < 0 || head.x >= BOARD_SIZE || head.y < 0 || head.y >= BOARD_SIZE) {
+    if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
       return true;
     }
     
@@ -51,7 +40,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
   // 移动蛇
   const moveSnake = useCallback(() => {
-    if (gameStatus !== 'playing') return;
+    if (gameState !== 'playing') return;
 
     setSnake(prevSnake => {
       const newSnake = [...prevSnake];
@@ -63,7 +52,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       
       // 检查碰撞
       if (checkCollision(head)) {
-        setGameStatus('gameOver');
+        setGameState('gameOver');
         onGameOver && onGameOver(score);
         return prevSnake;
       }
@@ -76,16 +65,15 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         setFood(generateFood());
         
         // 增加分数
-        const newScore = score + 10 * level;
+        const newScore = score + 10 * 1; // Level is hardcoded to 1 for now
         setScore(newScore);
         onScoreUpdate && onScoreUpdate(newScore);
         
         // 每100分增加等级
-        const newLevel = Math.floor(newScore / 100) + 1;
-        if (newLevel !== level) {
-          setLevel(newLevel);
-          setSpeed(Math.max(50, INITIAL_SPEED - (newLevel - 1) * 10));
-        }
+        // if (newLevel !== level) { // This line was removed from the new_code, so it's removed here.
+        //   setLevel(newLevel);
+        //   // setSpeed(Math.max(50, INITIAL_SPEED - (newLevel - 1) * 10)); // This line was removed from the new_code, so it's removed here.
+        // }
       } else {
         // 没吃到食物，移除尾部
         newSnake.pop();
@@ -93,11 +81,11 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       
       return newSnake;
     });
-  }, [gameStatus, direction, food, score, level, checkCollision, generateFood, onGameOver, onScoreUpdate]);
+  }, [gameState, direction, food, score, checkCollision, generateFood, onGameOver, onScoreUpdate]);
 
   // 改变方向
   const changeDirection = useCallback((newDirection) => {
-    if (gameStatus !== 'playing') return;
+    if (gameState !== 'playing') return;
     
     // 防止反向移动
     if (
@@ -110,19 +98,20 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     }
     
     setDirection(newDirection);
-  }, [gameStatus, direction]);
+  }, [gameState, direction]);
 
   // 游戏循环
   useEffect(() => {
-    if (gameStatus === 'playing') {
-      gameLoopRef.current = setInterval(moveSnake, speed);
+    if (gameState === 'playing') {
+      // setGameLoop(setInterval(moveSnake, speed)); // This line was removed from the new_code, so it's removed here.
     }
+    
     return () => {
       if (gameLoopRef.current) {
         clearInterval(gameLoopRef.current);
       }
     };
-  }, [gameStatus, speed, moveSnake]);
+  }, [gameState, moveSnake]);
 
   // 键盘事件处理
   useEffect(() => {
@@ -146,10 +135,10 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
           break;
         case ' ':
           event.preventDefault();
-          if (gameStatus === 'playing') {
-            setGameStatus('paused');
-          } else if (gameStatus === 'paused') {
-            setGameStatus('playing');
+          if (gameState === 'playing') {
+            setGameState('paused');
+          } else if (gameState === 'paused') {
+            setGameState('playing');
           }
           break;
         default:
@@ -159,7 +148,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gameStatus, changeDirection]);
+  }, [gameState, changeDirection]);
 
   // 准备游戏
   const toggleReady = () => {
@@ -168,41 +157,41 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
   // 开始游戏
   const startGame = () => {
-    setGameStatus('playing');
+    setGameState('playing');
     setGameStarted(true);
     
     // 注册全局暂停/继续回调
-    window.gamePauseCallback = () => setGameStatus('paused');
-    window.gameResumeCallback = () => setGameStatus('playing');
+    window.gamePauseCallback = () => setGameState('paused');
+    window.gameResumeCallback = () => setGameState('playing');
   };
 
   // 重新开始游戏
   const restartGame = () => {
-    setSnake(INITIAL_SNAKE);
-    setDirection(INITIAL_DIRECTION);
+    setSnake([{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }]);
+    setDirection({ x: 1, y: 0 });
     setFood({ x: 15, y: 15 });
-    setGameStatus('playing');
+    setGameState('playing');
     setScore(0);
-    setLevel(1);
-    setSpeed(INITIAL_SPEED);
+    // setLevel(1); // This line was removed from the new_code, so it's removed here.
+    // setSpeed(INITIAL_SPEED); // This line was removed from the new_code, so it's removed here.
     setGameStarted(true);
   };
 
   // 渲染游戏板
   const renderBoard = () => {
-    const board = Array.from({ length: BOARD_SIZE }, () => 
-      Array.from({ length: BOARD_SIZE }, () => null)
+    const board = Array.from({ length: GRID_SIZE }, () => 
+      Array.from({ length: GRID_SIZE }, () => null)
     );
 
     // 放置蛇
     snake.forEach((segment, index) => {
-      if (segment.y >= 0 && segment.y < BOARD_SIZE && segment.x >= 0 && segment.x < BOARD_SIZE) {
+      if (segment.y >= 0 && segment.y < GRID_SIZE && segment.x >= 0 && segment.x < GRID_SIZE) {
         board[segment.y][segment.x] = index === 0 ? 'head' : 'body';
       }
     });
 
     // 放置食物
-    if (food.y >= 0 && food.y < BOARD_SIZE && food.x >= 0 && food.x < BOARD_SIZE) {
+    if (food.y >= 0 && food.y < GRID_SIZE && food.x >= 0 && food.x < GRID_SIZE) {
       board[food.y][food.x] = 'food';
     }
 
@@ -210,7 +199,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`,
+          gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
           gap: 0.5,
           width: '400px',
           height: '400px',
@@ -242,7 +231,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
   };
 
   return (
-    <Box ref={gameRef} sx={{ p: 3 }}>
+    <Box ref={canvasRef} sx={{ p: 3 }}>
       <Grid container spacing={3}>
         {/* 游戏信息 */}
         <Grid item xs={12} md={4}>
@@ -259,22 +248,13 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
             {/* 游戏状态 */}
             <Box sx={{ mb: 3 }}>
-              <Chip
-                label={gameStatus === 'waiting' ? '等待开始' : 
-                       gameStatus === 'playing' ? '游戏中' : 
-                       gameStatus === 'paused' ? '已暂停' : '游戏结束'}
-                color={gameStatus === 'playing' ? 'success' : 
-                       gameStatus === 'gameOver' ? 'error' : 'default'}
-                sx={{ mb: 2 }}
-              />
+              {/* Removed Chip component as per new_code */}
               
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Typography variant="body2">
                   分数: <strong>{score}</strong>
                 </Typography>
-                <Typography variant="body2">
-                  等级: <strong>{level}</strong>
-                </Typography>
+                {/* Removed level and speed as per new_code */}
                 <Typography variant="body2">
                   长度: <strong>{snake.length}</strong>
                 </Typography>
@@ -303,7 +283,7 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
                 </>
               ) : (
                 <>
-                  {gameStatus === 'gameOver' && (
+                  {gameState === 'gameOver' && (
                     <Button
                       variant="contained"
                       onClick={restartGame}
@@ -312,10 +292,10 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
                       重新开始
                     </Button>
                   )}
-                  {gameStatus === 'paused' && (
+                  {gameState === 'paused' && (
                     <Button
                       variant="contained"
-                      onClick={() => setGameStatus('playing')}
+                      onClick={() => setGameState('playing')}
                       fullWidth
                     >
                       继续游戏
@@ -343,13 +323,13 @@ const SnakeGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         {/* 游戏画布 */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, textAlign: 'center' }}>
-            {gameStatus === 'gameOver' && (
+            {gameState === 'gameOver' && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 游戏结束！最终分数: {score}
               </Alert>
             )}
             
-            {gameStatus === 'paused' && (
+            {gameState === 'paused' && (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 游戏已暂停
               </Alert>

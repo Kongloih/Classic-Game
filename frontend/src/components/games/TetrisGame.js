@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Typography, Button, Grid, Paper, Alert, Chip } from '@mui/material';
-import { useSelector } from 'react-redux';
+import { Box, Typography, Button, Grid } from '@mui/material';
 
 // 俄罗斯方块形状定义
 const TETROMINOES = {
@@ -67,19 +66,16 @@ const BOARD_HEIGHT = 20;
 const INITIAL_DROP_TIME = 1000;
 
 const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
-  const { user } = useSelector(state => state.auth);
-  const [gameBoard, setGameBoard] = useState(createEmptyBoard());
-  const [currentPiece, setCurrentPiece] = useState(null);
-  const [nextPiece, setNextPiece] = useState(null);
-  const [gameStatus, setGameStatus] = useState('waiting'); // waiting, playing, paused, gameOver
+  const [gameState, setGameState] = useState('waiting'); // waiting, playing, paused, gameOver
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [lines, setLines] = useState(0);
-  const [dropTime, setDropTime] = useState(INITIAL_DROP_TIME);
-  const [isReady, setIsReady] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
-  
-  const gameRef = useRef(null);
+  const [isReady, setIsReady] = useState(false);
+  const [gameBoard, setGameBoard] = useState(createEmptyBoard());
+  const [currentPiece, setCurrentPiece] = useState(null);
+  const [nextPiece, setNextPiece] = useState(null);
+  const [dropTime, setDropTime] = useState(1000);
   const dropTimeRef = useRef(null);
 
   // 创建空游戏板
@@ -159,7 +155,7 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
   // 移动方块
   const movePiece = useCallback((direction) => {
-    if (gameStatus !== 'playing' || !currentPiece) return;
+    if (gameState !== 'playing' || !currentPiece) return;
 
     let newX = currentPiece.x;
     let newY = currentPiece.y;
@@ -215,25 +211,25 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       // 检查游戏结束
       if (checkCollision(newPiece, clearedBoard, 
         Math.floor(BOARD_WIDTH / 2) - Math.floor(newPiece.shape[0].length / 2), 0)) {
-        setGameStatus('gameOver');
+        setGameState('gameOver');
         onGameOver && onGameOver(newScore);
       }
     }
-  }, [currentPiece, gameBoard, gameStatus, score, level, lines, nextPiece, onGameOver, onScoreUpdate]);
+  }, [currentPiece, gameBoard, gameState, score, level, lines, nextPiece, onGameOver, onScoreUpdate]);
 
   // 旋转方块
   const rotateCurrentPiece = useCallback(() => {
-    if (gameStatus !== 'playing' || !currentPiece) return;
+    if (gameState !== 'playing' || !currentPiece) return;
 
     const rotated = rotatePiece(currentPiece);
     if (!checkCollision(rotated, gameBoard, currentPiece.x, currentPiece.y)) {
       setCurrentPiece(rotated);
     }
-  }, [currentPiece, gameBoard, gameStatus]);
+  }, [currentPiece, gameBoard, gameState]);
 
   // 快速下落
   const hardDrop = useCallback(() => {
-    if (gameStatus !== 'playing' || !currentPiece) return;
+    if (gameState !== 'playing' || !currentPiece) return;
 
     let dropDistance = 0;
     while (!checkCollision(currentPiece, gameBoard, currentPiece.x, currentPiece.y + dropDistance + 1)) {
@@ -243,7 +239,7 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     if (dropDistance > 0) {
       movePiece('down');
     }
-  }, [currentPiece, gameBoard, gameStatus, movePiece]);
+  }, [currentPiece, gameBoard, gameState, movePiece]);
 
   // 准备/取消准备
   const toggleReady = () => {
@@ -262,7 +258,7 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       y: 0
     });
     setNextPiece(secondPiece);
-    setGameStatus('playing');
+    setGameState('playing');
     setGameStarted(true);
     setScore(0);
     setLevel(1);
@@ -270,13 +266,13 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
     setGameBoard(createEmptyBoard());
     
     // 注册全局暂停/继续回调
-    window.gamePauseCallback = () => setGameStatus('paused');
-    window.gameResumeCallback = () => setGameStatus('playing');
+    window.gamePauseCallback = () => setGameState('paused');
+    window.gameResumeCallback = () => setGameState('playing');
   };
 
   // 重新开始游戏
   const restartGame = () => {
-    setGameStatus('waiting');
+    setGameState('waiting');
     setGameStarted(false);
     setScore(0);
     setLevel(1);
@@ -288,7 +284,7 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
   // 键盘事件处理
   useEffect(() => {
     const handleKeyPress = (event) => {
-      if (gameStatus !== 'playing') return;
+      if (gameState !== 'playing') return;
 
       switch (event.key) {
         case 'ArrowLeft':
@@ -318,11 +314,11 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gameStatus, movePiece, rotateCurrentPiece, hardDrop]);
+  }, [gameState, movePiece, rotateCurrentPiece, hardDrop]);
 
   // 自动下落
   useEffect(() => {
-    if (gameStatus === 'playing') {
+    if (gameState === 'playing') {
       dropTimeRef.current = setInterval(() => {
         movePiece('down');
       }, dropTime);
@@ -333,14 +329,14 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
         clearInterval(dropTimeRef.current);
       }
     };
-  }, [gameStatus, dropTime, movePiece]);
+  }, [gameState, dropTime, movePiece]);
 
   // 渲染游戏板
   const renderBoard = (board, currentPiece = null, title = '游戏板') => {
     const displayBoard = board.map(row => [...row]);
     
     // 将当前方块绘制到显示板上
-    if (currentPiece && gameStatus === 'playing') {
+    if (currentPiece && gameState === 'playing') {
       for (let row = 0; row < currentPiece.shape.length; row++) {
         for (let col = 0; col < currentPiece.shape[row].length; col++) {
           if (currentPiece.shape[row][col] !== 0) {
@@ -423,15 +419,25 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
       {!gameStarted && (
         <Box sx={{ mb: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
           <Button
-            variant={isReady ? "outlined" : "contained"}
-            color={isReady ? "success" : "primary"}
+            variant={isReady ? 'contained' : 'outlined'}
             onClick={toggleReady}
+            fullWidth
           >
-            {isReady ? '取消准备' : '准备'}
+            {isReady ? '已准备' : '准备'}
           </Button>
           
           {isReady && (
-            <Button variant="contained" color="success" onClick={startGame}>
+            <Button 
+              variant="contained" 
+              sx={{
+                backgroundColor: 'success.main',
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: 'success.dark',
+                }
+              }}
+              onClick={startGame}
+            >
               开始游戏
             </Button>
           )}
@@ -440,14 +446,14 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
 
       {/* 游戏状态显示 */}
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
-        <Chip 
+        {/* <Chip 
           label={`准备状态: ${isReady ? '已准备' : '未准备'}`} 
           color={isReady ? 'success' : 'default'}
-        />
-        <Chip 
-          label={`游戏状态: ${gameStatus === 'playing' ? '进行中' : gameStatus === 'waiting' ? '等待中' : '游戏结束'}`} 
-          color={gameStatus === 'playing' ? 'success' : gameStatus === 'waiting' ? 'warning' : 'error'}
-        />
+        /> */}
+        {/* <Chip 
+          label={`游戏状态: ${gameState === 'playing' ? '进行中' : gameState === 'waiting' ? '等待中' : '游戏结束'}`} 
+          color={gameState === 'playing' ? 'success' : gameState === 'waiting' ? 'warning' : 'error'}
+        /> */}
       </Box>
 
       <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
@@ -478,7 +484,7 @@ const TetrisGame = ({ roomId, onGameOver, onScoreUpdate }) => {
           </Box>
 
           {/* 重新开始按钮 */}
-          {gameStatus === 'gameOver' && (
+          {gameState === 'gameOver' && (
             <Box sx={{ mt: 2 }}>
               <Button 
                 variant="contained" 

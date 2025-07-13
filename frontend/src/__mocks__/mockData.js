@@ -488,8 +488,7 @@ export const mockGameStates = {
   }
 };
 
-// 导出所有Mock数据
-export default {
+const mockData = {
   users: mockUsers,
   games: mockGames,
   gameRooms: mockGameRooms,
@@ -501,4 +500,6 @@ export default {
   settings: mockSettings,
   apiResponses: mockApiResponses,
   gameStates: mockGameStates
-}; 
+};
+
+export default mockData; 

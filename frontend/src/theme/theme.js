@@ -39,6 +39,12 @@ const theme = createTheme({
       dark: '#2980b9',
       contrastText: '#ffffff',
     },
+    default: {
+      main: '#f5f6fa',
+      light: '#ffffff',
+      dark: '#e0e0e0',
+      contrastText: '#2c3e50',
+    },
     background: {
       default: '#f5f6fa',
       paper: '#ffffff',
@@ -48,6 +54,28 @@ const theme = createTheme({
       secondary: '#7f8c8d',
     },
     divider: 'rgba(0, 0, 0, 0.12)',
+    grey: {
+      50: '#fafafa',
+      100: '#f5f5f5',
+      200: '#eeeeee',
+      300: '#e0e0e0',
+      400: '#bdbdbd',
+      500: '#9e9e9e',
+      600: '#757575',
+      700: '#616161',
+      800: '#424242',
+      900: '#212121',
+    },
+  },
+  zIndex: {
+    mobileStepper: 1000,
+    fab: 1050,
+    speedDial: 1050,
+    appBar: 1100,
+    drawer: 1200,
+    modal: 1300,
+    snackbar: 1400,
+    tooltip: 1500,
   },
   typography: {
     fontFamily: [
@@ -113,6 +141,9 @@ const theme = createTheme({
           borderRadius: 8,
           fontWeight: 500,
         },
+      },
+      defaultProps: {
+        color: 'primary',
       },
     },
     MuiCard: {

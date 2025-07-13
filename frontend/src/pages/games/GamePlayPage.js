@@ -7,35 +7,29 @@ import {
   Card,
   CardContent,
   Grid,
-  Chip,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  useTheme,
 } from '@mui/material';
 import {
   PlayArrow,
   Pause,
   Stop,
   Settings,
-  Fullscreen,
   ExitToApp,
   EmojiEvents,
   Timer,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import TetrisGame from '../../components/games/TetrisGame';
 import SnakeGame from '../../components/games/SnakeGame';
 import BreakoutGame from '../../components/games/BreakoutGame';
 
 const GamePlayPage = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { gameId } = useParams();
-  const { user } = useSelector(state => state.auth);
   
   const [gameState, setGameState] = useState('playing'); // playing, paused, gameOver
   const [score, setScore] = useState(0);

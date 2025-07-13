@@ -9,15 +9,12 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  Badge,
   useTheme,
-  useMediaQuery,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Notifications as NotificationsIcon,
   AccountCircle,
-  ExitToApp,
+  Logout,
   Settings,
   Person,
 } from '@mui/icons-material';
@@ -26,11 +23,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 
 const Header = ({ onSidebarToggle, sidebarOpen }) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+  const theme = useTheme();
   const { user, isAuthenticated } = useSelector(state => state.auth);
   const [anchorEl, setAnchorEl] = useState(null);
 
@@ -132,9 +127,9 @@ const Header = ({ onSidebarToggle, sidebarOpen }) => {
                 color="inherit"
                 sx={{ mr: 1 }}
               >
-                <Badge badgeContent={3} color="error">
-                  <NotificationsIcon />
-                </Badge>
+                {/* <Badge badgeContent={3} color="error"> // This line was removed as per the edit hint */}
+                  {/* <NotificationsIcon /> // This line was removed as per the edit hint */}
+                {/* </Badge> // This line was removed as per the edit hint */}
               </IconButton>
 
               {/* 用户菜单 */}
@@ -181,7 +176,7 @@ const Header = ({ onSidebarToggle, sidebarOpen }) => {
                   设置
                 </MenuItem>
                 <MenuItem onClick={handleLogout}>
-                  <ExitToApp sx={{ mr: 1 }} />
+                  <Logout sx={{ mr: 1 }} />
                   退出登录
                 </MenuItem>
               </Menu>

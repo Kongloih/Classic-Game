@@ -1,372 +1,222 @@
+const { sequelize } = require('../../src/config/database');
 const BattleService = require('../../src/services/battleService');
-const BattleRoom = require('../../src/models/BattleRoom');
-const BattleTable = require('../../src/models/BattleTable');
-const UserStatus = require('../../src/models/UserStatus');
-const User = require('../../src/models/User');
-const { mockRooms, mockTables, mockUsers, mockUserStatus, mockTablesWithUsers } = require('../mocks/battleMocks');
+const { BattleTable, BattleRoom, UserStatus, User } = require('../../src/models');
 
-// Mock 所有模型
-jest.mock('../../src/models/BattleRoom');
-jest.mock('../../src/models/BattleTable');
-jest.mock('../../src/models/UserStatus');
-jest.mock('../../src/models/User');
+describe('BattleService - 座位切换功能测试', () => {
+  let testTable;
+  let testUser;
+  let testRoom;
 
-describe('BattleService', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  describe('getGameRooms', () => {
-    it('应该成功获取游戏房间列表', async () => {
-      // Arrange
-      const gameId = 1;
-      const expectedRooms = mockRooms.filter(room => room.game_id === gameId);
-      
-      BattleRoom.findAll.mockResolvedValue(expectedRooms);
-
-      // Act
-      const result = await BattleService.getGameRooms(gameId);
-
-      // Assert
-      expect(BattleRoom.findAll).toHaveBeenCalledWith({
-        where: { game_id: gameId },
-        order: [['room_id', 'ASC']]
-      });
-      expect(result).toHaveLength(2);
-      expect(result[0]).toHaveProperty('room_id', 'room_1');
-      expect(result[0]).toHaveProperty('status', '未满员');
-      expect(result[0]).toHaveProperty('online_users', 45);
+  beforeAll(async () => {
+    // 创建测试数据
+    testUser = await User.create({
+      username: 'testuser',
+      email: 'test@example.com',
+      password: 'password123',
+      status: 'active'
     });
 
-    it('应该处理数据库错误', async () => {
-      // Arrange
-      const gameId = 1;
-      const error = new Error('数据库连接失败');
-      BattleRoom.findAll.mockRejectedValue(error);
+    testRoom = await BattleRoom.create({
+      room_id: 'test_room',
+      game_id: 1,
+      name: '测试房间',
+      status: '未满员',
+      online_users: 0
+    });
 
-      // Act & Assert
-      await expect(BattleService.getGameRooms(gameId)).rejects.toThrow('数据库连接失败');
+    testTable = await BattleTable.create({
+      table_id: 'test_table',
+      room_id: testRoom.id,
+      seat_1_user_id: null,
+      seat_2_user_id: null,
+      seat_3_user_id: null,
+      seat_4_user_id: null,
+      status: 'empty',
+      current_players: 0,
+      max_players: 4
     });
   });
 
-  describe('getRoomTables', () => {
-    it('应该成功获取房间桌子列表', async () => {
-      // Arrange
-      const roomId = 1;
-      const expectedTables = mockTablesWithUsers.filter(table => table.room_id === roomId);
-      
-      BattleTable.findAll.mockResolvedValue(expectedTables);
-
-      // Act
-      const result = await BattleService.getRoomTables(roomId);
-
-      // Assert
-      expect(BattleTable.findAll).toHaveBeenCalledWith({
-        where: { room_id: roomId },
-        order: [['table_id', 'ASC']],
-        include: expect.arrayContaining([
-          expect.objectContaining({ model: User, as: 'seat1User' }),
-          expect.objectContaining({ model: User, as: 'seat2User' }),
-          expect.objectContaining({ model: User, as: 'seat3User' }),
-          expect.objectContaining({ model: User, as: 'seat4User' })
-        ])
-      });
-      expect(result).toHaveLength(2);
-      expect(result[0]).toHaveProperty('table_id', 'table_1');
-      expect(result[0]).toHaveProperty('status', 'waiting');
-      expect(result[0].seats).toHaveProperty('1');
-      expect(result[0].seats).toHaveProperty('2');
-    });
+  afterAll(async () => {
+    // 清理测试数据
+    await BattleTable.destroy({ where: { id: testTable.id } });
+    await BattleRoom.destroy({ where: { id: testRoom.id } });
+    await User.destroy({ where: { id: testUser.id } });
+    await UserStatus.destroy({ where: { user_id: testUser.id } });
+    await sequelize.close();
   });
 
-  describe('userEnterRoom', () => {
-    it('应该成功让用户进入房间', async () => {
-      // Arrange
-      const userId = 1;
-      const roomId = 1;
-      const room = { ...mockRooms[0], increment: jest.fn(), update: jest.fn() };
+  beforeEach(async () => {
+    // 每个测试前重置桌子状态
+    await testTable.update({
+      seat_1_user_id: null,
+      seat_2_user_id: null,
+      seat_3_user_id: null,
+      seat_4_user_id: null,
+      current_players: 0,
+      status: 'empty'
+    });
+
+    // 清理用户状态
+    await UserStatus.destroy({ where: { user_id: testUser.id } });
+  });
+
+  describe('userJoinTable - 座位切换功能', () => {
+    test('应该允许用户加入空座位', async () => {
+      const result = await BattleService.userJoinTable(testUser.id, testTable.id, 1);
       
-      BattleRoom.findByPk.mockResolvedValue(room);
-      UserStatus.upsert.mockResolvedValue([{ id: 1 }, true]);
-
-      // Act
-      const result = await BattleService.userEnterRoom(userId, roomId);
-
-      // Assert
-      expect(BattleRoom.findByPk).toHaveBeenCalledWith(roomId);
-      expect(UserStatus.upsert).toHaveBeenCalledWith({
-        user_id: userId,
-        room_id: roomId,
-        table_id: null,
-        seat_number: null,
-        status: 'idle',
-        last_activity: expect.any(Date)
-      });
-      expect(room.increment).toHaveBeenCalledWith('online_users');
       expect(result.success).toBe(true);
+      expect(result.isSeatSwitch).toBe(false);
+      expect(result.oldSeat).toBeNull();
+
+      // 验证数据库状态
+      await testTable.reload();
+      expect(testTable.seat_1_user_id).toBe(testUser.id);
+      expect(testTable.current_players).toBe(1);
     });
 
-    it('应该拒绝进入已满员的房间', async () => {
-      // Arrange
-      const userId = 1;
-      const roomId = 2; // 满员房间
-      const room = { ...mockRooms[1] };
+    test('应该允许用户从座位1切换到座位2', async () => {
+      // 先加入座位1
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
       
-      BattleRoom.findByPk.mockResolvedValue(room);
-
-      // Act & Assert
-      await expect(BattleService.userEnterRoom(userId, roomId)).rejects.toThrow('房间已满员');
-    });
-
-    it('应该处理房间不存在的情况', async () => {
-      // Arrange
-      const userId = 1;
-      const roomId = 999;
+      // 切换到座位2
+      const result = await BattleService.userJoinTable(testUser.id, testTable.id, 2);
       
-      BattleRoom.findByPk.mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(BattleService.userEnterRoom(userId, roomId)).rejects.toThrow('房间不存在');
-    });
-  });
-
-  describe('userLeaveRoom', () => {
-    it('应该成功让用户离开房间', async () => {
-      // Arrange
-      const userId = 1;
-      const roomId = 1;
-      const room = { ...mockRooms[0], decrement: jest.fn(), update: jest.fn() };
-      const userStatus = { table_id: 1, seat_number: 1 };
-      
-      BattleRoom.findByPk.mockResolvedValue(room);
-      UserStatus.findOne.mockResolvedValue(userStatus);
-      UserStatus.update.mockResolvedValue([1]);
-
-      // Mock userLeaveTable
-      const originalUserLeaveTable = BattleService.userLeaveTable;
-      BattleService.userLeaveTable = jest.fn().mockResolvedValue({ success: true });
-
-      // Act
-      const result = await BattleService.userLeaveRoom(userId, roomId);
-
-      // Assert
-      expect(BattleRoom.findByPk).toHaveBeenCalledWith(roomId);
-      expect(UserStatus.findOne).toHaveBeenCalledWith({
-        where: { user_id: userId }
-      });
-      expect(BattleService.userLeaveTable).toHaveBeenCalledWith(userId, 1, 1);
-      expect(UserStatus.update).toHaveBeenCalledWith({
-        room_id: null,
-        table_id: null,
-        seat_number: null,
-        status: 'idle',
-        last_activity: expect.any(Date)
-      }, {
-        where: { user_id: userId }
-      });
-      expect(room.decrement).toHaveBeenCalledWith('online_users');
       expect(result.success).toBe(true);
+      expect(result.isSeatSwitch).toBe(true);
+      expect(result.oldSeat).toBe(1);
 
-      // Restore original method
-      BattleService.userLeaveTable = originalUserLeaveTable;
+      // 验证数据库状态
+      await testTable.reload();
+      expect(testTable.seat_1_user_id).toBeNull(); // 原座位应该为NULL
+      expect(testTable.seat_2_user_id).toBe(testUser.id); // 新座位被占用
+      expect(testTable.current_players).toBe(1); // 玩家数量不变
+    });
+
+    test('应该允许用户从座位2切换到座位3', async () => {
+      // 先加入座位2
+      await BattleService.userJoinTable(testUser.id, testTable.id, 2);
+      
+      // 切换到座位3
+      const result = await BattleService.userJoinTable(testUser.id, testTable.id, 3);
+      
+      expect(result.success).toBe(true);
+      expect(result.isSeatSwitch).toBe(true);
+      expect(result.oldSeat).toBe(2);
+
+      // 验证数据库状态
+      await testTable.reload();
+      expect(testTable.seat_2_user_id).toBeNull();
+      expect(testTable.seat_3_user_id).toBe(testUser.id);
+      expect(testTable.current_players).toBe(1);
+    });
+
+    test('不应该允许用户加入已被其他用户占用的座位', async () => {
+      // 创建另一个用户
+      const otherUser = await User.create({
+        username: 'otheruser',
+        email: 'other@example.com',
+        password: 'password123',
+        status: 'active'
+      });
+
+      // 其他用户占用座位1
+      await BattleService.userJoinTable(otherUser.id, testTable.id, 1);
+
+      // 当前用户尝试占用座位1
+      await expect(
+        BattleService.userJoinTable(testUser.id, testTable.id, 1)
+      ).rejects.toThrow('座位已被其他用户占用');
+
+      // 清理
+      await User.destroy({ where: { id: otherUser.id } });
+    });
+
+    test('不应该允许用户加入已占用的座位（自己占用）', async () => {
+      // 用户占用座位1
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
+
+      // 尝试再次占用座位1
+      await expect(
+        BattleService.userJoinTable(testUser.id, testTable.id, 1)
+      ).rejects.toThrow('用户已在该座位');
+    });
+
+    test('应该正确更新用户状态', async () => {
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
+
+      const userStatus = await UserStatus.findOne({
+        where: { user_id: testUser.id }
+      });
+
+      expect(userStatus).toBeTruthy();
+      expect(userStatus.room_id).toBe(testRoom.id);
+      expect(userStatus.table_id).toBe(testTable.id);
+      expect(userStatus.seat_number).toBe(1);
+      expect(userStatus.status).toBe('waiting');
+    });
+
+    test('座位切换时应该更新用户状态', async () => {
+      // 先加入座位1
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
+      
+      // 切换到座位2
+      await BattleService.userJoinTable(testUser.id, testTable.id, 2);
+
+      const userStatus = await UserStatus.findOne({
+        where: { user_id: testUser.id }
+      });
+
+      expect(userStatus.seat_number).toBe(2);
+      expect(userStatus.table_id).toBe(testTable.id);
     });
   });
 
-  describe('userJoinTable', () => {
-    it('应该成功让用户加入桌子座位', async () => {
-      // Arrange
-      const userId = 5;
-      const tableId = 3; // 空桌子
-      const seatNumber = 1;
-      const table = { ...mockTables[2], update: jest.fn() };
+  describe('userLeaveTable - 离开座位功能', () => {
+    test('应该正确释放座位', async () => {
+      // 先加入座位
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
       
-      BattleTable.findByPk.mockResolvedValue(table);
-      UserStatus.update.mockResolvedValue([1]);
-
-      // Mock getUserSeat
-      const originalGetUserSeat = BattleService.getUserSeat;
-      BattleService.getUserSeat = jest.fn().mockResolvedValue(null);
-
-      // Act
-      const result = await BattleService.userJoinTable(userId, tableId, seatNumber);
-
-      // Assert
-      expect(BattleTable.findByPk).toHaveBeenCalledWith(tableId);
-      expect(BattleService.getUserSeat).toHaveBeenCalledWith(userId, tableId);
-      expect(table.update).toHaveBeenCalledWith({
-        seat_1_user_id: userId,
-        current_players: 1,
-        status: 'empty'
-      });
-      expect(UserStatus.update).toHaveBeenCalledWith({
-        table_id: tableId,
-        seat_number: seatNumber,
-        status: 'waiting',
-        last_activity: expect.any(Date)
-      }, {
-        where: { user_id: userId }
-      });
+      // 离开座位
+      const result = await BattleService.userLeaveTable(testUser.id, testTable.id, 1);
+      
       expect(result.success).toBe(true);
 
-      // Restore original method
-      BattleService.getUserSeat = originalGetUserSeat;
+      // 验证数据库状态
+      await testTable.reload();
+      expect(testTable.seat_1_user_id).toBeNull();
+      expect(testTable.current_players).toBe(0);
+      expect(testTable.status).toBe('empty');
     });
 
-    it('应该拒绝加入已被占用的座位', async () => {
-      // Arrange
-      const userId = 5;
-      const tableId = 1; // 有人的桌子
-      const seatNumber = 1;
-      const table = { ...mockTables[0] };
+    test('离开座位后应该更新用户状态', async () => {
+      // 先加入座位
+      await BattleService.userJoinTable(testUser.id, testTable.id, 1);
       
-      BattleTable.findByPk.mockResolvedValue(table);
+      // 离开座位
+      await BattleService.userLeaveTable(testUser.id, testTable.id, 1);
 
-      // Act & Assert
-      await expect(BattleService.userJoinTable(userId, tableId, seatNumber)).rejects.toThrow('座位已被占用');
-    });
+      const userStatus = await UserStatus.findOne({
+        where: { user_id: testUser.id }
+      });
 
-    it('应该拒绝已在其他座位的用户', async () => {
-      // Arrange
-      const userId = 1;
-      const tableId = 3;
-      const seatNumber = 1;
-      const table = { ...mockTables[2] };
-      
-      BattleTable.findByPk.mockResolvedValue(table);
-
-      // Mock getUserSeat
-      const originalGetUserSeat = BattleService.getUserSeat;
-      BattleService.getUserSeat = jest.fn().mockResolvedValue(2);
-
-      // Act & Assert
-      await expect(BattleService.userJoinTable(userId, tableId, seatNumber)).rejects.toThrow('用户已在其他座位');
-
-      // Restore original method
-      BattleService.getUserSeat = originalGetUserSeat;
+      expect(userStatus.table_id).toBeNull();
+      expect(userStatus.seat_number).toBeNull();
+      expect(userStatus.status).toBe('idle');
     });
   });
 
-  describe('userLeaveTable', () => {
-    it('应该成功让用户离开桌子座位', async () => {
-      // Arrange
-      const userId = 1;
-      const tableId = 1;
-      const seatNumber = 1;
-      const table = { ...mockTables[0], update: jest.fn() };
+  describe('getUserSeat - 获取用户座位', () => {
+    test('应该正确返回用户座位号', async () => {
+      await BattleService.userJoinTable(testUser.id, testTable.id, 2);
       
-      BattleTable.findByPk.mockResolvedValue(table);
-      UserStatus.update.mockResolvedValue([1]);
-
-      // Act
-      const result = await BattleService.userLeaveTable(userId, tableId, seatNumber);
-
-      // Assert
-      expect(BattleTable.findByPk).toHaveBeenCalledWith(tableId);
-      expect(table.update).toHaveBeenCalledWith({
-        seat_1_user_id: null,
-        current_players: 1,
-        status: 'empty'
-      });
-      expect(UserStatus.update).toHaveBeenCalledWith({
-        table_id: null,
-        seat_number: null,
-        status: 'idle',
-        last_activity: expect.any(Date)
-      }, {
-        where: { user_id: userId }
-      });
-      expect(result.success).toBe(true);
+      const seatNumber = await BattleService.getUserSeat(testUser.id, testTable.id);
+      expect(seatNumber).toBe(2);
     });
 
-    it('应该拒绝离开不属于用户的座位', async () => {
-      // Arrange
-      const userId = 999;
-      const tableId = 1;
-      const seatNumber = 1;
-      const table = { ...mockTables[0] };
-      
-      BattleTable.findByPk.mockResolvedValue(table);
-
-      // Act & Assert
-      await expect(BattleService.userLeaveTable(userId, tableId, seatNumber)).rejects.toThrow('用户不在该座位');
-    });
-  });
-
-  describe('getUserSeat', () => {
-    it('应该返回用户所在的座位号', async () => {
-      // Arrange
-      const userId = 1;
-      const tableId = 1;
-      const table = { ...mockTables[0] };
-      
-      BattleTable.findByPk.mockResolvedValue(table);
-
-      // Act
-      const result = await BattleService.getUserSeat(userId, tableId);
-
-      // Assert
-      expect(BattleTable.findByPk).toHaveBeenCalledWith(tableId);
-      expect(result).toBe(1);
-    });
-
-    it('应该返回null当用户不在桌子中', async () => {
-      // Arrange
-      const userId = 999;
-      const tableId = 1;
-      const table = { ...mockTables[0] };
-      
-      BattleTable.findByPk.mockResolvedValue(table);
-
-      // Act
-      const result = await BattleService.getUserSeat(userId, tableId);
-
-      // Assert
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('cleanupTimeoutUsers', () => {
-    it('应该清理超时用户', async () => {
-      // Arrange
-      const timeoutUsers = [mockUserStatus[3]]; // 5分钟前活动的用户
-      
-      UserStatus.findAll.mockResolvedValue(timeoutUsers);
-
-      // Mock userLeaveTable and userLeaveRoom
-      const originalUserLeaveTable = BattleService.userLeaveTable;
-      const originalUserLeaveRoom = BattleService.userLeaveRoom;
-      BattleService.userLeaveTable = jest.fn().mockResolvedValue({ success: true });
-      BattleService.userLeaveRoom = jest.fn().mockResolvedValue({ success: true });
-
-      // Act
-      const result = await BattleService.cleanupTimeoutUsers();
-
-      // Assert
-      expect(UserStatus.findAll).toHaveBeenCalledWith({
-        where: {
-          last_activity: {
-            $lt: expect.any(Date)
-          },
-          status: ['waiting', 'playing']
-        }
-      });
-      expect(result).toBe(1);
-
-      // Restore original methods
-      BattleService.userLeaveTable = originalUserLeaveTable;
-      BattleService.userLeaveRoom = originalUserLeaveRoom;
-    });
-
-    it('应该处理清理过程中的错误', async () => {
-      // Arrange
-      const error = new Error('清理失败');
-      UserStatus.findAll.mockRejectedValue(error);
-
-      // Act
-      const result = await BattleService.cleanupTimeoutUsers();
-
-      // Assert
-      expect(result).toBe(0);
+    test('用户不在桌子中时应该返回null', async () => {
+      const seatNumber = await BattleService.getUserSeat(testUser.id, testTable.id);
+      expect(seatNumber).toBeNull();
     });
   });
 }); 

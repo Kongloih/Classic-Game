@@ -6,6 +6,9 @@ const compression = require('compression');
 const swaggerUi = require('swagger-ui-express');
 const { specs } = require('./config/swagger');
 
+// 初始化模型关联
+require('./models');
+
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
 const { authMiddleware } = require('./middleware/auth');

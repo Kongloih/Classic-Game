@@ -75,4 +75,13 @@ const BattleTable = sequelize.define('BattleTable', {
   ]
 });
 
+// 定义模型关联
+BattleTable.associate = (models) => {
+  BattleTable.belongsTo(models.User, { as: 'seat1User', foreignKey: 'seat_1_user_id' });
+  BattleTable.belongsTo(models.User, { as: 'seat2User', foreignKey: 'seat_2_user_id' });
+  BattleTable.belongsTo(models.User, { as: 'seat3User', foreignKey: 'seat_3_user_id' });
+  BattleTable.belongsTo(models.User, { as: 'seat4User', foreignKey: 'seat_4_user_id' });
+  BattleTable.belongsTo(models.BattleRoom, { foreignKey: 'room_id' });
+};
+
 module.exports = BattleTable; 

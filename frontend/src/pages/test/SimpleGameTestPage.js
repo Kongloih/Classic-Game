@@ -10,7 +10,6 @@ import {
   Tabs,
   Tab,
   Paper,
-  Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import TetrisGame from '../../components/games/TetrisGame';

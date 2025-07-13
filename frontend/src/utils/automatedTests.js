@@ -168,8 +168,9 @@ const gameComponentTests = {
         { type: 'hardDrop' }
       ];
 
-      for (const op of operations) {
+      for (const _op of operations) {
         // 模拟操作处理
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(50);
       }
 
@@ -224,8 +225,9 @@ const gameComponentTests = {
         { type: 'pause' }
       ];
 
-      for (const op of operations) {
+      for (const _op of operations) {
         // 模拟操作处理
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(50);
       }
 
@@ -279,8 +281,9 @@ const gameComponentTests = {
         { type: 'launch' }
       ];
 
-      for (const op of operations) {
+      for (const _op of operations) {
         // 模拟操作处理
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(50);
       }
 
@@ -319,7 +322,8 @@ const pageComponentTests = {
         { type: 'sort', by: 'popularity' }
       ];
 
-      for (const interaction of interactions) {
+      for (const _interaction of interactions) {
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(100);
       }
 
@@ -355,7 +359,8 @@ const pageComponentTests = {
         { type: 'startGame' }
       ];
 
-      for (const interaction of interactions) {
+      for (const _interaction of interactions) {
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(100);
       }
 
@@ -394,7 +399,8 @@ const reduxStateTests = {
         { type: 'LOGIN_FAILURE', payload: authData.error }
       ];
 
-      for (const change of stateChanges) {
+      for (const _change of stateChanges) {
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(50);
       }
 
@@ -430,7 +436,8 @@ const reduxStateTests = {
         { type: 'END_GAME', payload: gameData.gameHistory }
       ];
 
-      for (const change of stateChanges) {
+      for (const _change of stateChanges) {
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(50);
       }
 
@@ -534,6 +541,7 @@ class AutomatedTestRunner {
         }
         
         console.log(`  ⚠️  ${testName} 第${attempt}次尝试失败，正在重试...`);
+        // eslint-disable-next-line no-unused-vars
         await utils.delay(this.config.delay);
       }
     }

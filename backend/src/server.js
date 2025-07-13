@@ -210,21 +210,77 @@ const startServer = async () => {
     });
 
     // 优雅关闭处理
-    process.on('SIGTERM', () => {
-      console.log('🔄 收到SIGTERM信号，开始优雅关闭...');
-      server.close(() => {
-        console.log('✅ HTTP服务器已关闭');
-        process.exit(0);
-      });
-    });
+    const gracefulShutdown = async (signal) => {
+      console.log(`🔄 收到${signal}信号，开始优雅关闭...`);
+      
+      // 设置超时，防止优雅关闭卡住
+      const shutdownTimeout = setTimeout(() => {
+        console.error('❌ 优雅关闭超时，强制退出');
+        process.exit(1);
+      }, 10000); // 10秒超时
+      
+      try {
+        // 1. 关闭HTTP服务器
+        await new Promise((resolve) => {
+          server.close(() => {
+            console.log('✅ HTTP服务器已关闭');
+            resolve();
+          });
+        });
 
-    process.on('SIGINT', () => {
-      console.log('🔄 收到SIGINT信号，开始优雅关闭...');
-      server.close(() => {
-        console.log('✅ HTTP服务器已关闭');
+        // 2. 关闭Socket.IO连接
+        if (io) {
+          // 断开所有客户端连接
+          io.sockets.sockets.forEach(socket => {
+            socket.disconnect(true);
+          });
+          
+          // 关闭Socket.IO服务器
+          await new Promise((resolve) => {
+            io.close(() => {
+              console.log('✅ Socket.IO服务器已关闭');
+              resolve();
+            });
+          });
+        }
+
+        // 3. 关闭数据库连接
+        if (sequelize) {
+          await sequelize.close();
+          console.log('✅ 数据库连接已关闭');
+        }
+
+        // 4. 关闭Redis连接
+        const { closeRedis } = require('./config/redis');
+        try {
+          await closeRedis();
+          console.log('✅ Redis连接已关闭');
+        } catch (redisError) {
+          console.warn('⚠️ Redis关闭失败:', redisError.message);
+        }
+
+        // 5. 停止清理服务
+        try {
+          CleanupService.stopCleanupTasks();
+          console.log('✅ 清理服务已停止');
+        } catch (cleanupError) {
+          console.warn('⚠️ 清理服务停止失败:', cleanupError.message);
+        }
+
+        // 清除超时定时器
+        clearTimeout(shutdownTimeout);
+        
+        console.log('🎉 所有服务已优雅关闭');
         process.exit(0);
-      });
-    });
+      } catch (error) {
+        console.error('❌ 优雅关闭过程中出错:', error);
+        clearTimeout(shutdownTimeout);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   } catch (error) {
     console.error('❌ 服务器启动失败:', error);

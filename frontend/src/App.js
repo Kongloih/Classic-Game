@@ -15,7 +15,6 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import GameHallPage from './pages/games/GameHallPage';
 import GameSelectionPage from './pages/games/GameSelectionPage';
 import GameDetailPage from './pages/games/GameDetailPage';
 import GamePlayPage from './pages/games/GamePlayPage';

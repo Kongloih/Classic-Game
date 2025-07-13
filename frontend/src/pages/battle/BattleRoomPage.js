@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Container,
@@ -14,24 +14,18 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  useTheme,
 } from '@mui/material';
 import {
-  People,
-  EmojiEvents,
-  Star,
   PlayArrow,
   ExitToApp,
   Chat,
   Settings,
-  Timer,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { socketService } from '../../services/socketService';
 
 const BattleRoomPage = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { gameId, roomId } = useParams();
   const { user } = useSelector(state => state.auth);
@@ -43,14 +37,13 @@ const BattleRoomPage = () => {
   const [loading, setLoading] = useState(true);
 
   // 游戏类型映射
-  const gameTypeMap = {
-    '1': '俄罗斯方块',
-    '2': '贪吃蛇',
-    '3': '打砖块',
-    '4': '2048',
-    '5': '扫雷',
-    '6': '五子棋'
-  };
+  const gameTypeMap = useMemo(() => ({
+    1: '俄罗斯方块',
+    2: '贪吃蛇',
+    3: '打砖块',
+    4: '2048',
+    5: '扫雷'
+  }), []);
 
   // 连接WebSocket并加入房间
   useEffect(() => {
@@ -184,7 +177,7 @@ const BattleRoomPage = () => {
       socketService.off('game_finished');
       socketService.off('player_left_game');
     };
-  }, [roomId, gameId]);
+  }, [roomId, gameId, gameTypeMap]);
 
   // 倒计时效果
   useEffect(() => {
@@ -199,38 +192,21 @@ const BattleRoomPage = () => {
     }
   }, [countdown, gameState]);
 
+  // 准备状态切换
   const handleReady = () => {
-    if (roomData) {
-      // 使用真实用户ID匹配
-      const currentPlayer = roomData.players.find(p => p.id === user?.id);
-      
-      if (currentPlayer) {
-        const newReadyState = !currentPlayer.isReady;
-        
-        console.log(`🔧 准备状态切换: ${currentPlayer.username} ${newReadyState ? '准备' : '取消准备'}`);
-        
-        socketService.emit('player_ready', {
-          roomId,
-          isReady: newReadyState
-        });
-      } else {
-        console.warn('⚠️ 未找到当前玩家信息');
-      }
-    }
-  };
-
-  const handleStartGame = () => {
-    socketService.emit('start_game', { roomId });
+    socketService.emit('toggle_ready_status', {
+      roomId,
+      isReady: !roomData?.players.find(p => p.id === user?.id)?.isReady
+    });
   };
 
   const handleLeaveRoom = () => {
-    // 离开房间逻辑
-    navigate('/games');
+    socketService.emit('leave_game_room', { roomId });
+    navigate('/battle');
   };
 
   const handleStartPlaying = () => {
-    const targetGameId = roomData?.gameId || '1';
-    navigate(`/play/${targetGameId}`);
+    socketService.emit('start_game', { roomId });
   };
 
   if (loading) {
@@ -288,59 +264,17 @@ const BattleRoomPage = () => {
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>}
+            <Chip
               label={`玩家: ${roomData.players.length}/${roomData.maxPlayers}`}
               color="primary"
               variant="outlined"
             />
-            <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>}
+            <Chip
               label={roomData.gameType}
               color="secondary"
               variant="outlined"
             />
-            <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>}
+            <Chip
               label={`最高分: ${Math.max(...roomData.players.map(p => p.score))}`}
               color="success"
               variant="outlined"
@@ -394,42 +328,23 @@ const BattleRoomPage = () => {
                       <Typography variant="h6" fontWeight={600}>
                         {player.username}
                         {player.isHost && (
-                          <Typography
-            variant="caption"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              bgcolor: 'primary.main',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            房主
-          </Typography>
+                          <Chip
+                            label="房主"
+                            size="small"
+                            color="primary"
+                            sx={{ ml: 1 }}
+                          />
                         )}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         等级 {player.level} • 分数 {player.score}
                       </Typography>
                     </Box>
-                    <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>
+                    <Chip
+                      label={player.isReady ? '已准备' : '未准备'}
+                      color={player.isReady ? 'success' : 'default'}
+                      size="small"
+                    />
                   </Box>
 
                   {/* 玩家统计 */}
@@ -464,7 +379,14 @@ const BattleRoomPage = () => {
                   {player.id === user?.id && gameState === 'waiting' && (
                     <Button
                       variant={player.isReady ? 'outlined' : 'contained'}
-                      color={player.isReady ? 'success' : 'primary'}
+                      sx={{
+                        color: player.isReady ? 'success.main' : 'white',
+                        borderColor: player.isReady ? 'success.main' : 'transparent',
+                        backgroundColor: player.isReady ? 'transparent' : 'primary.main',
+                        '&:hover': {
+                          backgroundColor: player.isReady ? 'success.50' : 'primary.dark',
+                        }
+                      }}
                       fullWidth
                       onClick={handleReady}
                     >

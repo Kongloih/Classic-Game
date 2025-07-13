@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const BattleRoom = require('../models/BattleRoom');
 const RoomService = require('../services/roomService');
 
 // 在线用户管理
@@ -229,82 +230,127 @@ const socketHandler = (io) => {
     // 处理加入桌子
     socket.on('join_table', async (data) => {
       const { tableId, roomId, seatNumber, userId, username } = data;
-      
+      console.log('--- [join_table] 收到前端请求 ---');
+      console.log('参数:', { tableId, roomId, seatNumber, userId, username });
       try {
-        console.log(`🔧 用户 ${socket.username} 尝试加入桌子 ${tableId} 座位 ${seatNumber}，房间 ${roomId}`);
-        
         // 导入必要的模型和服务
         const BattleTable = require('../models/BattleTable');
         const BattleService = require('../services/battleService');
         
-        // 查找桌子，同时检查table_id和room_id
+        // 确保参数类型正确
+        const parsedTableId = parseInt(tableId);
+        const parsedRoomId = parseInt(roomId);
+        const parsedSeatNumber = parseInt(seatNumber);
+        
+        console.log('🔧 解析后的参数:', { parsedTableId, parsedRoomId, parsedSeatNumber });
+        
+        // 查找桌子，使用table_id字段查找
+        // 首先尝试通过主键ID查找房间
+        let room = await BattleRoom.findByPk(parsedRoomId);
+        
+        // 如果找不到，尝试通过room_id字段查找
+        if (!room) {
+          room = await BattleRoom.findOne({
+            where: { room_id: parsedRoomId }
+          });
+        }
+        
+        if (!room) {
+          console.log(`[join_table] ❌ 房间 ${parsedRoomId} 不存在`);
+          socket.emit('join_table_failed', {
+            tableId: parsedTableId,
+            seatNumber: parsedSeatNumber,
+            message: '房间不存在'
+          });
+          return;
+        }
+        
+        console.log(`[join_table] ✅ 找到房间: ${room.name} (ID: ${room.id}, room_id: ${room.room_id})`);
+        
+        // 使用房间的主键ID查找桌子
         const table = await BattleTable.findOne({
           where: { 
-            table_id: tableId,
-            room_id: roomId
+            table_id: parsedTableId,
+            room_id: room.id  // 使用房间的主键ID
           }
         });
-        
         if (!table) {
-          console.log(`❌ 桌子 ${tableId} 在房间 ${roomId} 中不存在`);
+          console.log(`[join_table] ❌ 桌子 ${parsedTableId} 在房间 ${parsedRoomId} 中不存在`);
           socket.emit('join_table_failed', {
-            tableId,
-            seatNumber,
+            tableId: parsedTableId,
+            seatNumber: parsedSeatNumber,
             message: '桌子不存在'
           });
           return;
         }
-        
+        console.log(`[join_table] ✅ 找到桌子:`, table.toJSON());
         // 检查座位是否已被占用
-        const seatField = `seat_${seatNumber}_user_id`;
+        const seatField = `seat_${parsedSeatNumber}_user_id`;
+        console.log(`[join_table] 检查座位字段:`, seatField, '当前值:', table[seatField]);
         if (table[seatField]) {
-          console.log(`❌ 座位 ${seatNumber} 已被占用`);
+          console.log(`[join_table] ❌ 座位 ${parsedSeatNumber} 已被占用，当前用户ID: ${table[seatField]}`);
           socket.emit('join_table_failed', {
-            tableId,
-            seatNumber,
+            tableId: parsedTableId,
+            seatNumber: parsedSeatNumber,
             message: '座位已被占用'
           });
           return;
         }
-        
-        // 检查用户是否已在其他座位
+        // 检查用户是否已在其他座位（现在支持座位切换，所以只记录日志）
         const existingSeat = await BattleService.getUserSeat(userId, table.id);
-        if (existingSeat) {
-          console.log(`❌ 用户已在座位 ${existingSeat}`);
+        console.log(`[join_table] 用户是否已在其他座位:`, existingSeat);
+        if (existingSeat && existingSeat === parsedSeatNumber) {
+          console.log(`[join_table] ❌ 用户已在该座位 ${existingSeat}`);
           socket.emit('join_table_failed', {
-            tableId,
-            seatNumber,
-            message: '您已在其他座位'
+            tableId: parsedTableId,
+            seatNumber: parsedSeatNumber,
+            message: '您已在该座位'
           });
           return;
         }
-        
         // 加入座位
-        await BattleService.userJoinTable(userId, table.id, seatNumber);
-        
-        console.log(`✅ 用户 ${socket.username} 成功加入桌子 ${tableId} 座位 ${seatNumber}`);
+        console.log(`[join_table] 调用userJoinTable...`);
+        const result = await BattleService.userJoinTable(userId, table.id, parsedSeatNumber);
+        console.log(`[join_table] ✅ userJoinTable结果:`, result);
         
         // 发送成功响应
         socket.emit('join_table_success', {
-          tableId,
-          seatNumber,
+          tableId: parsedTableId,
+          seatNumber: parsedSeatNumber,
           userId,
-          username
+          username,
+          isSeatSwitch: result.isSeatSwitch,
+          isTableSwitch: result.isTableSwitch,
+          oldSeat: result.oldSeat,
+          oldTableInfo: result.oldTableInfo
         });
         
         // 广播给其他用户
         socket.broadcast.emit('player_joined_table', {
-          tableId,
-          seatNumber,
+          tableId: parsedTableId,
+          seatNumber: parsedSeatNumber,
           userId,
-          username
+          username,
+          isSeatSwitch: result.isSeatSwitch,
+          isTableSwitch: result.isTableSwitch,
+          oldSeat: result.oldSeat,
+          oldTableInfo: result.oldTableInfo
         });
-        
+
+        // 如果是跨桌子切换，广播离开原桌子的事件
+        if (result.isTableSwitch && result.oldTableInfo) {
+          socket.broadcast.emit('player_left_table', {
+            tableId: result.oldTableInfo.tableId,
+            seatNumber: result.oldTableInfo.seatNumber,
+            userId,
+            username
+          });
+        }
       } catch (error) {
-        console.error('❌ 加入桌子失败:', error);
+        console.error('[join_table] ❌ 加入桌子失败:', error);
         socket.emit('join_table_failed', {
-          tableId,
-          seatNumber,
+          tableId: parsedTableId,
+          seatNumber: parsedSeatNumber,
           message: error.message || '加入桌子失败'
         });
       }
@@ -322,10 +368,26 @@ const socketHandler = (io) => {
         const BattleService = require('../services/battleService');
         
         // 查找桌子，同时检查table_id和room_id
+        // 首先尝试通过主键ID查找房间
+        let room = await BattleRoom.findByPk(roomId);
+        
+        // 如果找不到，尝试通过room_id字段查找
+        if (!room) {
+          room = await BattleRoom.findOne({
+            where: { room_id: roomId }
+          });
+        }
+        
+        if (!room) {
+          console.log(`❌ 房间 ${roomId} 不存在`);
+          return;
+        }
+        
+        // 使用房间的主键ID查找桌子
         const table = await BattleTable.findOne({
           where: { 
             table_id: tableId,
-            room_id: roomId
+            room_id: room.id  // 使用房间的主键ID
           }
         });
         

@@ -1,8 +1,6 @@
-const BattleRoom = require('../models/BattleRoom');
-const BattleTable = require('../models/BattleTable');
-const UserStatus = require('../models/UserStatus');
-const User = require('../models/User');
+const { BattleRoom, BattleTable, UserStatus, User, Game } = require('../models');
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/database');
 
 class BattleService {
   // 获取游戏的所有房间
@@ -30,6 +28,18 @@ class BattleService {
   // 获取房间内的所有桌子
   static async getRoomTables(roomId) {
     try {
+      // 首先获取房间信息，包括game_id
+      const room = await BattleRoom.findByPk(roomId);
+      if (!room) {
+        throw new Error('房间不存在');
+      }
+
+      // 获取游戏信息，包括座位配置
+      const game = await Game.findByPk(room.game_id);
+      if (!game) {
+        throw new Error('游戏不存在');
+      }
+
       const tables = await BattleTable.findAll({
         where: { room_id: roomId },
         order: [['table_id', 'ASC']],
@@ -67,6 +77,8 @@ class BattleService {
         status: table.status,
         current_players: table.current_players,
         max_players: table.max_players,
+        max_seat: game.max_seat,
+        available_seats: game.available_seats || [1, 2, 3, 4],
         seats: {
           1: table.seat1User,
           2: table.seat2User,
@@ -169,36 +181,112 @@ class BattleService {
         throw new Error('桌子不存在');
       }
 
-      // 检查座位是否已被占用
+      console.log(`🔧 用户 ${userId} 加入桌子 ${tableId} 座位 ${seatNumber}`);
+      console.log(`📊 桌子当前状态:`, table.toJSON());
+
+      // 检查座位是否已被占用（被其他用户占用）
       const seatField = `seat_${seatNumber}_user_id`;
-      if (table[seatField]) {
-        throw new Error('座位已被占用');
+      if (table[seatField] && table[seatField] !== userId) {
+        throw new Error('座位已被其他用户占用');
       }
 
-      // 检查用户是否已在其他座位
+      // 检查用户是否已在其他座位（同一张桌子）
       const existingSeat = await this.getUserSeat(userId, tableId);
+      let isSeatSwitch = false;
+      let isTableSwitch = false;
+      let oldTableInfo = null;
+      
       if (existingSeat) {
-        throw new Error('用户已在其他座位');
+        if (existingSeat === seatNumber) {
+          throw new Error('用户已在该座位');
+        }
+        console.log(`🔄 用户 ${userId} 从座位 ${existingSeat} 切换到座位 ${seatNumber}（同一张桌子）`);
+        isSeatSwitch = true;
+      } else {
+        // 检查用户是否在其他桌子中
+        const currentTableInfo = await this.getUserCurrentTable(userId);
+        if (currentTableInfo && currentTableInfo.tableId !== tableId) {
+          console.log(`🔄 用户 ${userId} 从桌子 ${currentTableInfo.tableId} 座位 ${currentTableInfo.seatNumber} 切换到桌子 ${tableId} 座位 ${seatNumber}`);
+          isTableSwitch = true;
+          oldTableInfo = currentTableInfo;
+        }
       }
 
-      // 占用座位
-      await table.update({
-        [seatField]: userId,
-        current_players: table.current_players + 1,
-        status: table.current_players + 1 >= 2 ? 'waiting' : 'empty'
-      });
+      // 如果是跨桌子切换，先离开原桌子
+      if (isTableSwitch && oldTableInfo) {
+        console.log(`🔧 处理跨桌子切换，离开原桌子 ${oldTableInfo.tableId} 座位 ${oldTableInfo.seatNumber}`);
+        
+        // 释放原桌子的座位
+        const oldSeatField = `seat_${oldTableInfo.seatNumber}_user_id`;
+        await sequelize.query(
+          `UPDATE battle_tables SET ${oldSeatField} = NULL, current_players = GREATEST(0, current_players - 1), status = CASE WHEN GREATEST(0, current_players - 1) < 2 THEN 'empty' ELSE 'waiting' END WHERE id = ?`,
+          {
+            replacements: [oldTableInfo.tableId],
+            type: sequelize.QueryTypes.UPDATE
+          }
+        );
+        
+        console.log(`✅ 释放原桌子 ${oldTableInfo.tableId} 座位 ${oldTableInfo.seatNumber}`);
+      }
 
-      // 更新用户状态
-      await UserStatus.update({
+      // 如果是同一张桌子内的座位切换，先释放原座位
+      if (isSeatSwitch) {
+        const oldSeatField = `seat_${existingSeat}_user_id`;
+        
+        // 使用直接SQL更新来设置NULL值
+        await sequelize.query(
+          `UPDATE battle_tables SET ${oldSeatField} = NULL WHERE id = ?`,
+          {
+            replacements: [tableId],
+            type: sequelize.QueryTypes.UPDATE
+          }
+        );
+        
+        console.log(`✅ 释放原座位 ${existingSeat}`);
+        
+        // 重新加载桌子数据
+        await table.reload();
+      }
+
+      // 占用新座位
+      const updateData = {
+        [seatField]: userId,
+        current_players: (isSeatSwitch || isTableSwitch) ? table.current_players : table.current_players + 1,
+        status: ((isSeatSwitch || isTableSwitch) ? table.current_players : table.current_players + 1) >= 2 ? 'waiting' : 'empty'
+      };
+      
+      await table.update(updateData);
+      console.log(`✅ 桌子更新成功:`, updateData);
+
+      // 更新用户状态 - 使用upsert确保记录存在
+      await UserStatus.upsert({
+        user_id: userId,
+        room_id: table.room_id,
         table_id: tableId,
         seat_number: seatNumber,
         status: 'waiting',
         last_activity: new Date()
-      }, {
-        where: { user_id: userId }
       });
 
-      return { success: true, table };
+      console.log(`✅ 用户状态更新成功: 用户 ${userId} 在房间 ${table.room_id} 桌子 ${tableId} 座位 ${seatNumber}`);
+
+      // 更新房间在线用户数（只在非座位切换和非跨桌子切换时增加）
+      if (!isSeatSwitch && !isTableSwitch) {
+        const room = await BattleRoom.findByPk(table.room_id);
+        if (room) {
+          await room.increment('online_users');
+          console.log(`✅ 房间 ${table.room_id} 在线用户数增加`);
+        }
+      }
+
+      return { 
+        success: true, 
+        table: table.toJSON(),
+        isSeatSwitch,
+        isTableSwitch,
+        oldSeat: isSeatSwitch ? existingSeat : null,
+        oldTableInfo: oldTableInfo
+      };
     } catch (error) {
       console.error('用户加入桌子失败:', error);
       throw error;
@@ -220,12 +308,18 @@ class BattleService {
         throw new Error('用户不在该座位');
       }
 
-      // 释放座位
-      await table.update({
-        [seatField]: null,
-        current_players: Math.max(0, table.current_players - 1),
-        status: table.current_players - 1 < 2 ? 'empty' : 'waiting'
-      });
+      // 释放座位 - 使用直接SQL更新
+      await sequelize.query(
+        `UPDATE battle_tables SET ${seatField} = NULL, current_players = ?, status = ? WHERE id = ?`,
+        {
+          replacements: [
+            Math.max(0, table.current_players - 1),
+            table.current_players - 1 < 2 ? 'empty' : 'waiting',
+            tableId
+          ],
+          type: sequelize.QueryTypes.UPDATE
+        }
+      );
 
       // 更新用户状态
       await UserStatus.update({
@@ -260,6 +354,63 @@ class BattleService {
     } catch (error) {
       console.error('获取用户座位失败:', error);
       return null;
+    }
+  }
+
+  // 获取用户当前所在的桌子和座位（跨桌子查找）
+  static async getUserCurrentTable(userId) {
+    try {
+      // 从UserStatus表获取用户当前状态
+      const userStatus = await UserStatus.findOne({
+        where: { user_id: userId }
+      });
+
+      if (!userStatus || !userStatus.table_id) {
+        return null;
+      }
+
+      // 检查用户是否真的在该桌子中
+      const table = await BattleTable.findByPk(userStatus.table_id);
+      if (!table) {
+        return null;
+      }
+
+      const seatNumber = await this.getUserSeat(userId, userStatus.table_id);
+      if (!seatNumber) {
+        return null;
+      }
+
+      return {
+        tableId: userStatus.table_id,
+        seatNumber: seatNumber,
+        roomId: userStatus.room_id
+      };
+    } catch (error) {
+      console.error('获取用户当前桌子失败:', error);
+      return null;
+    }
+  }
+
+  // 创建游戏桌子
+  static async createGameTables(roomId, gameId, tableCount = 50) {
+    try {
+      const tables = [];
+      for (let i = 1; i <= tableCount; i++) {
+        const table = await BattleTable.create({
+          table_id: `table_${i}`,
+          room_id: roomId,
+          status: 'empty',
+          current_players: 0,
+          max_players: 4
+        });
+        tables.push(table);
+      }
+      
+      console.log(`✅ 为房间 ${roomId} 创建了 ${tableCount} 张桌子`);
+      return tables;
+    } catch (error) {
+      console.error('创建游戏桌子失败:', error);
+      throw error;
     }
   }
 

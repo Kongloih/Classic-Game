@@ -12,10 +12,8 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  People,
   Star,
   PlayArrow,
-  TrendingUp,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -98,25 +96,6 @@ const GameSelectionPage = () => {
     },
   ];
 
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case '简单': return 'success';
-      case '中等': return 'warning';
-      case '困难': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case '益智': return 'primary';
-      case '休闲': return 'secondary';
-      case '动作': return 'error';
-      case '棋类': return 'info';
-      default: return 'default';
-    }
-  };
-
   return (
     <Box sx={{ py: 4, minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="lg">
@@ -130,40 +109,12 @@ const GameSelectionPage = () => {
           </Typography>
           
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>}
+            <Chip
               label={`在线玩家: ${games.reduce((sum, game) => sum + game.onlinePlayers, 0)}`}
               color="primary"
               variant="outlined"
             />
-            <Typography
-            variant="body2"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>}
+            <Chip
               label={`今日游戏: ${games.reduce((sum, game) => sum + game.playCount, 0)}`}
               color="secondary"
               variant="outlined"
@@ -221,51 +172,24 @@ const GameSelectionPage = () => {
 
                   {/* 游戏标签 */}
                   <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-                    <Typography
-            variant="caption"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              bgcolor: 'primary.main',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>
-                    <Typography
-            variant="caption"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>
-                    <Typography
-            variant="caption"
-            sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              bgcolor: 'grey.500',
-              color: '#ffffff',
-              display: 'inline-block'
-            }}
-          >
-            
-          </Typography>
+                    <Chip
+                      label={game.players}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                    />
+                    <Chip
+                      label={game.difficulty}
+                      size="small"
+                      color="secondary"
+                      variant="outlined"
+                    />
+                    <Chip
+                      label={game.category}
+                      size="small"
+                      color="default"
+                      variant="outlined"
+                    />
                   </Box>
 
                   {/* 统计信息 */}

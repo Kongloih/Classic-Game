@@ -3,6 +3,7 @@ const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const BattleService = require('../services/battleService');
 const UserStatus = require('../models/UserStatus');
+const BattleRoom = require('../models/BattleRoom');
 
 // 获取游戏的所有房间
 router.get('/rooms/:gameId', authMiddleware, async (req, res) => {
@@ -27,7 +28,30 @@ router.get('/rooms/:gameId', authMiddleware, async (req, res) => {
 router.get('/tables/:roomId', authMiddleware, async (req, res) => {
   try {
     const { roomId } = req.params;
-    const tables = await BattleService.getRoomTables(roomId);
+    console.log(`🔧 获取房间 ${roomId} 的桌子数据`);
+    
+    // 首先尝试通过主键ID查找房间
+    let room = await BattleRoom.findByPk(roomId);
+    
+    // 如果找不到，尝试通过room_id字段查找
+    if (!room) {
+      room = await BattleRoom.findOne({
+        where: { room_id: roomId }
+      });
+    }
+    
+    if (!room) {
+      console.log(`❌ 房间 ${roomId} 不存在`);
+      return res.status(404).json({
+        success: false,
+        message: '房间不存在'
+      });
+    }
+    
+    console.log(`✅ 找到房间: ${room.name} (ID: ${room.id}, room_id: ${room.room_id})`);
+    
+    // 使用房间的主键ID获取桌子
+    const tables = await BattleService.getRoomTables(room.id);
     
     res.json({
       success: true,

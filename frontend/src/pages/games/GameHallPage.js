@@ -23,28 +23,20 @@ import {
   PlayArrow,
   Visibility} from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { gameApi } from '../../services/api';
 import { offlineGameApi } from '../../services/offlineApi';
 
 const GameHallPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { gameId } = useParams();
-  const { user } = useSelector(state => state.auth);
-  
-  const [gameTables, setGameTables] = useState([]);
-  const [gameInfo, setGameInfo] = useState(null);
-  const [stats, setStats] = useState({
-    onlineUsers: 0,
-    activeRooms: 0,
-    maxScore: 0
-  });
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState('all'); // all, available, full
-  const [sortType, setSortType] = useState('default'); // default, players, score
-  const [selectedTable, setSelectedTable] = useState(null);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [gameInfo, setGameInfo] = useState(null);
+  const [gameTables, setGameTables] = useState([]);
+  const [stats, setStats] = useState({ onlineUsers: 0, activeRooms: 0, maxScore: 0 });
+  const [filterType, setFilterType] = useState('all');
+  const [sortType, setSortType] = useState('id');
+  const [selectedTable, setSelectedTable] = useState(null);
 
   // 获取游戏大厅数据
   useEffect(() => {

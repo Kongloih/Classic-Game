@@ -19,8 +19,9 @@ export const login = createAsyncThunk(
         return rejectWithValue(data.message || '登录失败');
       }
 
-      // 保存token到localStorage
+      // 保存token和用户信息到localStorage
       localStorage.setItem('token', data.data.token);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
       return data.data;
     } catch (error) {
       return rejectWithValue(error.message || '网络错误');
@@ -50,6 +51,7 @@ export const register = createAsyncThunk(
       });
       
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       return response;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -83,6 +85,7 @@ export const checkAuthStatus = createAsyncThunk(
       return data.data;
     } catch (error) {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       return rejectWithValue(error.message);
     }
   }
@@ -105,6 +108,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.token = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
     },
     logout: (state) => {
       state.user = null;
@@ -112,6 +116,7 @@ const authSlice = createSlice({
       state.token = null;
       state.error = null;
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
     },
     clearError: (state) => {
       state.error = null;
@@ -163,6 +168,8 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       });
   }
 });

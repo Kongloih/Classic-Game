@@ -99,8 +99,8 @@ describe('BreakoutGame Component', () => {
   test('displays canvas element', () => {
     renderBreakoutGame();
     
-    // Canvas应该被渲染
-    const canvas = document.querySelector('canvas');
+    // 使用testing-library的方法查找canvas
+    const canvas = screen.getByRole('img', { hidden: true });
     expect(canvas).toBeInTheDocument();
   });
 

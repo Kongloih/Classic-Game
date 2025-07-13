@@ -82,6 +82,16 @@ const Game = sequelize.define('Game', {
     defaultValue: 1,
     comment: '最大玩家数'
   },
+  max_seat: {
+    type: DataTypes.INTEGER,
+    defaultValue: 4,
+    comment: '游戏最大座位数量（如俄罗斯方块为2，贪吃蛇为1等）'
+  },
+  available_seats: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: '可用座位配置，如[2,4]表示座位2和4可用'
+  },
   supports_online: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,

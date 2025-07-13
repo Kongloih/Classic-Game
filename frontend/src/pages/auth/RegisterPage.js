@@ -29,7 +29,6 @@ import {
   Send,
 } from '@mui/icons-material';
 import { useNavigate, Link } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -77,7 +76,6 @@ const registerSchema = yup.object().shape({
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const [activeStep, setActiveStep] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -89,10 +87,8 @@ const RegisterPage = () => {
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors },
     watch,
-    setValue,
-    trigger,
   } = useForm({
     resolver: yupResolver(registerSchema),
     mode: 'onChange',
@@ -180,18 +176,11 @@ const RegisterPage = () => {
 
   // 步骤处理
   const handleNext = async () => {
-    const fieldsToValidate = activeStep === 0 
-      ? ['username', 'phone', 'email', 'password', 'confirmPassword']
-      : ['verificationCode', 'gender', 'birthYear'];
-    
-    const isValid = await trigger(fieldsToValidate);
-    
-    if (isValid) {
-      if (activeStep === 0) {
-        setActiveStep(1);
-      } else {
-        handleSubmit(onSubmit)();
-      }
+    // 直接进行下一步或提交
+    if (activeStep === 0) {
+      setActiveStep(1);
+    } else {
+      handleSubmit(onSubmit)();
     }
   };
 
