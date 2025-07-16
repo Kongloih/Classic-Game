@@ -31,13 +31,13 @@ if (!process.env.CORS_ORIGIN) {
   process.env.CORS_ORIGIN = 'http://localhost:3000';
 }
 
-// 导入路由和中间件
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');
-const gameRoutes = require('./routes/game');
-const socialRoutes = require('./routes/social');
-const battleRoutes = require('./routes/battle');
-const gameHallRoutes = require('./routes/gameHall');
+// // 导入路由和中间件
+// const authRoutes = require('./routes/auth');
+// const userRoutes = require('./routes/user');
+// const gameRoutes = require('./routes/game');
+// const socialRoutes = require('./routes/social');
+// const battleRoutes = require('./routes/battle');
+// const gameHallRoutes = require('./routes/gameHall');
 
 // 导入Socket.IO处理器
 const socketHandler = require('./socket/socketHandler');
@@ -136,13 +136,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API路由
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/social', socialRoutes);
-app.use('/api/battles', battleRoutes);
-app.use('/api/games/hall', gameHallRoutes);
+// // API路由
+// app.use('/api/auth', authRoutes);
+// app.use('/api/users', userRoutes);
+// app.use('/api/games', gameRoutes);
+// app.use('/api/social', socialRoutes);
+// app.use('/api/battles', battleRoutes);
+// app.use('/api/games/hall', gameHallRoutes);
 
 // API文档
 if (process.env.NODE_ENV !== 'production') {
@@ -155,6 +155,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // 404处理
 app.use('*', (req, res) => {
+  console.log('未匹配的请求:', req.method, req.path);
   res.status(404).json({
     success: false,
     message: '请求的资源不存在'

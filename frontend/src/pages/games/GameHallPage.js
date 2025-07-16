@@ -23,7 +23,6 @@ import {
   PlayArrow,
   Visibility} from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { offlineGameApi } from '../../services/offlineApi';
 
 const GameHallPage = () => {
   const theme = useTheme();
@@ -38,35 +37,49 @@ const GameHallPage = () => {
   const [sortType, setSortType] = useState('id');
   const [selectedTable, setSelectedTable] = useState(null);
 
-  // 获取游戏大厅数据
+  // 获取游戏大厅数据（只用真实API）
   useEffect(() => {
     const fetchGameHallData = async () => {
       try {
         setLoading(true);
-        
-        // 检查是否为测试模式（没有认证token或URL包含test）
-        const isTestMode = !localStorage.getItem('token') || 
-                          window.location.pathname.includes('/test/') ||
-                          window.location.search.includes('testMode=true');
-        
-        // 使用离线API，如果后端未启动会自动使用模拟数据
-        const response = await offlineGameApi.getGameHall(gameId, isTestMode);
-        
-        if (response.success) {
-          setGameInfo(response.data.game);
-          setGameTables(response.data.gameTables || []);
-          setStats(response.data.stats || { onlineUsers: 0, activeRooms: 0, maxScore: 0 });
-        }
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('用户未登录，请先登录');
+        // 获取游戏信息
+        const gameRes = await fetch(`/api/games/${gameId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!gameRes.ok) throw new Error('获取游戏信息失败');
+        const gameData = await gameRes.json();
+        setGameInfo(gameData.data);
+        // 获取房间桌子数据
+        const tablesRes = await fetch(`/api/battle/rooms/${gameId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!tablesRes.ok) throw new Error('获取游戏桌数据失败');
+        const tablesData = await tablesRes.json();
+        setGameTables(tablesData.data || []);
+        // 统计信息（可根据实际API调整）
+        setStats({
+          onlineUsers: tablesData.data?.reduce((sum, t) => sum + (t.online_users || 0), 0) || 0,
+          activeRooms: tablesData.data?.length || 0,
+          maxScore: 0 // 如有API可获取最高分可替换
+        });
       } catch (error) {
         console.error('获取游戏大厅数据失败:', error);
-        // 如果API失败，显示空数据而不是模拟数据
         setGameTables([]);
         setStats({ onlineUsers: 0, activeRooms: 0, maxScore: 0 });
       } finally {
         setLoading(false);
       }
     };
-
     fetchGameHallData();
   }, [gameId]);
 
@@ -78,17 +91,15 @@ const GameHallPage = () => {
       return true;
     })
     .sort((a, b) => {
-      if (sortType === 'players') return b.players.length - a.players.length;
-      if (sortType === 'score') return b.maxScore - a.maxScore;
+      if (sortType === 'players') return (b.players?.length || 0) - (a.players?.length || 0);
+      if (sortType === 'score') return (b.maxScore || 0) - (a.maxScore || 0);
       return a.id - b.id; // 默认按ID排序
     });
 
   const handleTableClick = (table) => {
     if (table.status === 'full') {
-      // 观看模式
       navigate(`/battle/room/${gameId}/${table.id}`);
     } else {
-      // 加入游戏
       setSelectedTable(table);
       setJoinDialogOpen(true);
     }
@@ -148,7 +159,6 @@ const GameHallPage = () => {
               {gameInfo?.name || '游戏'} 游戏大厅
             </Typography>
           </Box>
-          
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Typography
               variant="body2"

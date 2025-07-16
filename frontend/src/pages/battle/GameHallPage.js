@@ -50,18 +50,39 @@ const GameHallPage = () => {
 
   // 初始化用户信息
   useEffect(() => {
+    console.log('=== [GameHallPage] 初始化用户信息 ===');
+    console.log('📊 Redux状态:', { reduxUser, isAuthenticated });
+    
     if (reduxUser && isAuthenticated) {
+      console.log('✅ 使用Redux用户信息:', reduxUser);
       setUser(reduxUser);
     } else {
+      console.log('⚠️ Redux状态无效，尝试从localStorage获取');
       // 后备方案：从localStorage获取
       const token = localStorage.getItem('token');
       const userInfo = localStorage.getItem('user');
+      
+      console.log('🔍 localStorage检查:', { 
+        hasToken: !!token, 
+        tokenLength: token?.length,
+        hasUserInfo: !!userInfo 
+      });
+      
       if (token && userInfo) {
         try {
-          setUser(JSON.parse(userInfo));
+          const parsedUser = JSON.parse(userInfo);
+          console.log('✅ 从localStorage获取用户信息:', parsedUser);
+          setUser(parsedUser);
         } catch (error) {
-          console.error('解析用户信息失败:', error);
+          console.error('❌ 解析用户信息失败:', error);
         }
+      } else {
+        console.log('❌ localStorage中没有有效的用户信息');
+        console.log('🔍 当前localStorage内容:', {
+          token: localStorage.getItem('token'),
+          user: localStorage.getItem('user'),
+          allKeys: Object.keys(localStorage)
+        });
       }
     }
   }, [reduxUser, isAuthenticated]);
@@ -75,130 +96,10 @@ const GameHallPage = () => {
   const loadRoomTables = useCallback(async (roomId) => {
     try {
       console.log(`🔄 正在加载房间 ${roomId} 的桌子数据...`);
+      setLoading(true); // 设置加载状态
       
-      // 找到对应的房间对象
-      const room = rooms.find(r => r.id === roomId);
-      if (!room) {
-        console.error(`❌ 找不到房间 ${roomId}`);
-        throw new Error('房间不存在');
-      }
-      
-      // 调用后端API获取桌子数据，使用room_id而不是id
-      const response = await fetch(`/api/battle/tables/${room.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('获取桌子数据失败');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        // 转换API返回的数据格式为前端需要的格式
-        const tableList = result.data.map(table => ({
-          id: table.table_id, // 使用table_id作为前端id
-          tableId: table.table_id,
-          status: table.status,
-          currentPlayers: table.current_players,
-          maxPlayers: table.max_players,
-          maxSeat: table.max_seat || 4, // 从Game表获取的max_seat
-          availableSeats: table.available_seats || [1, 2, 3, 4], // 从Game表获取的available_seats
-          seats: {
-            1: table.seats[1]?.id || table.seats[1] || null,
-            2: table.seats[2]?.id || table.seats[2] || null,
-            3: table.seats[3]?.id || table.seats[3] || null,
-            4: table.seats[4]?.id || table.seats[4] || null,
-          },
-          seatUsers: {
-            1: table.seats[1],
-            2: table.seats[2],
-            3: table.seats[3],
-            4: table.seats[4],
-          }
-        }));
-        
-        setTables(tableList);
-        console.log(`✅ 加载房间 ${room.room_id} 的桌子数据:`, tableList);
-      } else {
-        throw new Error(result.message || '获取桌子数据失败');
-      }
-    } catch (error) {
-      console.error('获取桌子数据失败:', error);
-      // 如果API失败，使用模拟数据作为后备
-      console.log('使用模拟数据作为后备');
-      const fallbackTables = [];
-      // 根据游戏ID确定可用座位配置
-      const gameSeatConfig = {
-        1: [2, 4], // 俄罗斯方块：座位2、4可用
-        2: [1],    // 贪吃蛇：座位1可用
-        3: [1],    // 打砖块：座位1可用
-        4: [1],    // 2048：座位1可用
-        5: [1]     // 扫雷：座位1可用
-      };
-      const availableSeats = gameSeatConfig[gameId] || [1, 2, 3, 4];
-      
-      for (let i = 1; i <= 50; i++) {
-        fallbackTables.push({
-          id: `table_${i}`,
-          tableId: i,
-          status: 'empty',
-          currentPlayers: 0,
-          maxPlayers: 4,
-          maxSeat: availableSeats.length, // 根据可用座位数量设置maxSeat
-          availableSeats: availableSeats,
-          seats: { 1: null, 2: null, 3: null, 4: null },
-          seatUsers: { 1: null, 2: null, 3: null, 4: null }
-        });
-      }
-      setTables(fallbackTables);
-    } finally {
-      setLoading(false);
-    }
-  }, [gameId]);
-
-  // 初始化WebSocket连接
-  const initWebSocket = useCallback(async () => {
-    try {
-      console.log('🔧 正在连接WebSocket...');
-      await socketService.connect();
-      console.log('✅ WebSocket连接成功');
-      
-      // 检查连接状态
-      const status = socketService.getConnectionStatus();
-      console.log('📊 WebSocket状态:', status);
-      
-    } catch (error) {
-      console.error('❌ WebSocket连接失败:', error);
-      // 不抛出错误，因为WebSocket不是必需的
-    }
-  }, []);
-
-  // 处理房间选择
-  const handleRoomSelect = useCallback(async (roomId) => {
-    try {
-      setSelectedRoom(roomId);
-      console.log(`选择房间: ${roomId}`);
-      
-      // 从API获取该房间的桌子数据
-      await loadRoomTables(roomId);
-    } catch (error) {
-      console.error('加载房间桌子失败:', error);
-      setError('加载房间数据失败');
-    }
-  }, []);
-
-  // 初始化房间列表
-  const initRooms = useCallback(async () => {
-    try {
-      console.log(`🔄 正在获取游戏ID ${gameId} 的房间列表...`);
-      
-      // 调用后端API获取房间列表
-      const response = await fetch(`/api/battle/rooms/${gameId}`, {
+      // 只请求后端API，不再使用模拟数据
+      const response = await fetch(`/api/battles/tables/${roomId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -213,9 +114,129 @@ const GameHallPage = () => {
       const result = await response.json();
       
       if (result.success) {
-        console.log(`✅ 获取到 ${result.data.length} 个房间:`, result.data);
+        // 转换API返回的数据格式为前端需要的格式
+        const tableList = result.data.map(table => {
+          // 检查座位占用情况
+          const seats = {};
+          const seatUsers = {};
+          for (let i = 1; i <= 4; i++) {
+            const seatUser = table.seats[i];
+            if (seatUser) {
+              seats[i] = seatUser.id || seatUser;
+              seatUsers[i] = seatUser;
+            } else {
+              seats[i] = null;
+              seatUsers[i] = null;
+            }
+          }
+          return {
+            id: table.id,
+            tableId: table.table_id,
+            status: table.status,
+            currentPlayers: table.current_players,
+            maxPlayers: table.max_players,
+            maxSeat: table.max_seat || 4,
+            availableSeats: table.available_seats || [1, 2, 3, 4],
+            seats,
+            seatUsers
+          };
+        });
+        setTables(tableList);
+        console.log(`✅ 加载房间 ${roomId} 的桌子数据:`, tableList);
+      } else {
+        throw new Error(result.message || '获取桌子数据失败');
+      }
+    } catch (error) {
+      console.error('获取桌子数据失败:', error);
+      setError('获取桌子数据失败: ' + error.message);
+      setTables([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [gameId]);
+
+  // 初始化WebSocket连接
+  const initWebSocket = useCallback(async () => {
+    try {
+      console.log('🔧 正在连接WebSocket...');
+      console.log('🔧 WebSocket URL:', process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000');
+      await socketService.connect();
+      console.log('✅ WebSocket连接成功');
+      // 检查连接状态
+      const status = socketService.getConnectionStatus();
+      console.log('📊 WebSocket状态:', status);
+      // 测试socket连接
+      socketService.emit('test_connection', { message: '前端连接测试' });
+      console.log('✅ 测试消息已发送');
+    } catch (error) {
+      console.error('❌ WebSocket连接失败:', error);
+      // 不抛出错误，因为WebSocket不是必需的
+    }
+  }, []);
+
+  // 处理房间选择
+  const handleRoomSelect = useCallback(async (roomId) => {
+    try {
+      console.log('=== [handleRoomSelect] 开始处理房间选择 ===');
+      console.log('📥 选择房间ID:', roomId);
+      console.log('📥 当前游戏ID:', gameId);
+      
+      // 立即设置选中房间和加载状态
+      setSelectedRoom(roomId);
+      setLoading(true);
+      console.log(`✅ 设置选中房间: ${roomId}`);
+      
+      // 跳过Socket事件发送（测试模式）
+      console.log('🔧 跳过Socket事件发送（测试模式）...');
+      
+      // 注释掉原来的Socket事件发送代码
+      /*
+      // 发送进入房间事件
+      console.log('🔧 发送进入房间socket事件...');
+      const socketData = {
+        roomId: parseInt(roomId),
+        gameId: parseInt(gameId)
+      };
+      
+      console.log('🔧 socket事件数据:', socketData);
+      console.log('🔧 socket连接状态:', socketService.getConnectionStatus());
+      
+      socketService.emit('enter_room', socketData);
+      console.log('✅ 进入房间事件已发送');
+      */
+      
+      // 从API获取该房间的桌子数据
+      await loadRoomTables(roomId);
+    } catch (error) {
+      console.error('❌ 加载房间桌子失败:', error);
+      setError('加载房间数据失败');
+      setLoading(false);
+    }
+  }, [gameId, loadRoomTables]);
+
+  // 初始化房间列表
+  const initRooms = useCallback(async () => {
+    try {
+      console.log(`🔄 正在获取游戏ID ${gameId} 的房间列表...`);
+      // 检查认证状态
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('用户未登录，请先登录');
+      }
+      // 调用后端API获取房间列表
+      const response = await fetch(`/api/battles/rooms/${gameId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const result = await response.json();
+      if (result.success) {
         setRooms(result.data);
-        
         // 默认选择第一个房间
         if (result.data.length > 0) {
           await handleRoomSelect(result.data[0].id);
@@ -225,38 +246,29 @@ const GameHallPage = () => {
       }
     } catch (error) {
       console.error('❌ 获取房间列表失败:', error);
-      
-      // API失败时使用后备数据
-      console.log('🔄 使用后备房间数据...');
-      const fallbackRooms = [
-        { id: 1, room_id: 'room_1', name: '俄罗斯方块房间1', status: '未满员', online_users: 0, game_id: 1 },
-        { id: 2, room_id: 'room_2', name: '俄罗斯方块房间2', status: '未满员', online_users: 0, game_id: 1 },
-        { id: 3, room_id: 'room_3', name: '俄罗斯方块房间3', status: '未满员', online_users: 0, game_id: 1 },
-      ];
-      
-      // 根据当前游戏ID过滤房间
-      const filteredRooms = fallbackRooms.filter(room => room.game_id === parseInt(gameId));
-      console.log(`🎮 游戏ID: ${gameId}, 后备房间:`, filteredRooms);
-      
-      setRooms(filteredRooms);
-      
-      // 默认选择第一个房间
-      if (filteredRooms.length > 0) {
-        await handleRoomSelect(filteredRooms[0].id);
-      }
+      setError('获取房间列表失败: ' + error.message);
+      setRooms([]);
     }
-  }, [gameId]);
+  }, [gameId, handleRoomSelect]);
 
   // 监听服务器响应
   useEffect(() => {
+    console.log('🔧 开始设置socket事件监听器...');
+    
     // 监听加入桌子成功
     socketService.on('join_table_success', (data) => {
-      console.log('✅ 加入桌子成功:', data);
-      setTables(prevTables => 
-        prevTables.map(table => {
+      console.log('=== [join_table_success] 收到服务器成功响应 ===');
+      console.log('📥 服务器返回数据:', data);
+      
+      setTables(prevTables => {
+        console.log('🔄 开始更新前端状态...');
+        console.log('📊 当前前端状态:', prevTables.map(t => ({ id: t.id, seats: t.seats, currentPlayers: t.currentPlayers })));
+        
+        const newTables = prevTables.map(table => {
           // 处理跨桌子切换：释放原桌子的座位
           if (data.isTableSwitch && data.oldTableInfo && table.id === data.oldTableInfo.tableId) {
-            return {
+            console.log(`🔄 处理跨桌子切换，释放原桌子 ${table.id} 座位 ${data.oldTableInfo.seatNumber}`);
+            const updatedTable = {
               ...table,
               seats: {
                 ...table.seats,
@@ -264,57 +276,137 @@ const GameHallPage = () => {
               },
               currentPlayers: Math.max(0, table.currentPlayers - 1)
             };
+            console.log(`✅ 原桌子更新完成:`, {
+              原座位: table.seats,
+              新座位: updatedTable.seats,
+              原玩家数: table.currentPlayers,
+              新玩家数: updatedTable.currentPlayers
+            });
+            return updatedTable;
           }
           
           // 处理当前桌子的更新
           if (table.id === data.tableId) {
-            return {
-              ...table,
-              seats: {
-                ...table.seats,
-                [data.seatNumber]: data.userId,
-                // 如果是座位切换，需要释放原座位
-                ...(data.isSeatSwitch && data.oldSeat ? { [data.oldSeat]: null } : {})
-              },
-              currentPlayers: (data.isSeatSwitch || data.isTableSwitch) ? table.currentPlayers : table.currentPlayers + 1
+            console.log(`🔄 处理当前桌子 ${table.id} 的更新`);
+            const newSeats = {
+              ...table.seats,
+              [data.seatNumber]: data.userId,
+              // 如果是座位切换，需要释放原座位
+              ...(data.isSeatSwitch && data.oldSeat ? { [data.oldSeat]: null } : {})
             };
+            
+            const newCurrentPlayers = (data.isSeatSwitch || data.isTableSwitch) ? table.currentPlayers : table.currentPlayers + 1;
+            
+            const updatedTable = {
+              ...table,
+              seats: newSeats,
+              currentPlayers: newCurrentPlayers
+            };
+            
+            console.log(`✅ 当前桌子更新完成:`, {
+              原座位: table.seats,
+              新座位: newSeats,
+              原玩家数: table.currentPlayers,
+              新玩家数: newCurrentPlayers,
+              是否座位切换: data.isSeatSwitch,
+              是否跨桌子切换: data.isTableSwitch
+            });
+            
+            return updatedTable;
           }
           
           return table;
-        })
-      );
+        });
+        
+        console.log('✅ 前端状态更新完成');
+        return newTables;
+      });
     });
 
     // 监听加入桌子失败
     socketService.on('join_table_failed', (data) => {
-      console.log('❌ 加入桌子失败:', data);
+      console.log('=== [join_table_failed] 收到服务器失败响应 ===');
+      console.log('📥 服务器返回数据:', data);
+      console.log('❌ 加入桌子失败:', data.message);
+      
       alert(`加入桌子失败: ${data.message}`);
       
       // 回滚本地状态
-      setTables(prevTables => 
-        prevTables.map(table => 
-          table.id === data.tableId 
-            ? {
-                ...table,
-                seats: {
-                  ...table.seats,
-                  [data.seatNumber]: null
-                },
-                currentPlayers: Math.max(0, table.currentPlayers - 1)
-              }
-            : table
-        )
-      );
+      console.log('🔄 回滚本地状态...');
+      setTables(prevTables => {
+        const newTables = prevTables.map(table => {
+          if (table.id === data.tableId) {
+            console.log(`🔄 回滚桌子 ${table.id} 的状态`);
+            const updatedTable = {
+              ...table,
+              seats: {
+                ...table.seats,
+                [data.seatNumber]: null
+              },
+              currentPlayers: Math.max(0, table.currentPlayers - 1)
+            };
+            console.log(`✅ 回滚完成:`, {
+              原座位: table.seats,
+              回滚后座位: updatedTable.seats,
+              原玩家数: table.currentPlayers,
+              回滚后玩家数: updatedTable.currentPlayers
+            });
+            return updatedTable;
+          }
+          return table;
+        });
+        console.log('✅ 本地状态回滚完成');
+        return newTables;
+      });
+    });
+
+    // 监听进入房间成功
+    socketService.on('enter_room_success', (data) => {
+      console.log('=== [enter_room_success] 收到服务器成功响应 ===');
+      console.log('📥 服务器返回数据:', data);
+      console.log('✅ 进入房间成功');
+      
+      // 可以在这里更新房间信息或显示成功消息
+      if (data.room) {
+        console.log('📊 房间信息更新:', {
+          online_users: data.room.online_users,
+          status: data.room.status
+        });
+      }
+      
+      if (data.previousTableInfo) {
+        console.log('📊 用户之前占用的座位信息:', data.previousTableInfo);
+      }
+    });
+
+    // 监听进入房间失败
+    socketService.on('enter_room_failed', (data) => {
+      console.log('=== [enter_room_failed] 收到服务器失败响应 ===');
+      console.log('📥 服务器返回数据:', data);
+      console.log('❌ 进入房间失败:', data.message);
+      
+      alert(`进入房间失败: ${data.message}`);
+    });
+
+    // 监听其他用户进入房间
+    socketService.on('user_entered_room', (data) => {
+      console.log('=== [user_entered_room] 收到其他用户进入房间事件 ===');
+      console.log('📥 事件数据:', data);
+      console.log(`👤 用户 ${data.username} 进入了房间 ${data.roomId}`);
     });
 
     // 监听其他玩家加入桌子
     socketService.on('player_joined_table', (data) => {
-      console.log('👤 其他玩家加入桌子:', data);
-      setTables(prevTables => 
-        prevTables.map(table => {
+      console.log('=== [player_joined_table] 收到其他玩家加入事件 ===');
+      console.log('📥 事件数据:', data);
+      
+      setTables(prevTables => {
+        console.log('🔄 更新其他玩家加入状态...');
+        const newTables = prevTables.map(table => {
           // 处理跨桌子切换：释放原桌子的座位
           if (data.isTableSwitch && data.oldTableInfo && table.id === data.oldTableInfo.tableId) {
-            return {
+            console.log(`🔄 处理其他玩家跨桌子切换，释放原桌子 ${table.id} 座位 ${data.oldTableInfo.seatNumber}`);
+            const updatedTable = {
               ...table,
               seats: {
                 ...table.seats,
@@ -322,52 +414,97 @@ const GameHallPage = () => {
               },
               currentPlayers: Math.max(0, table.currentPlayers - 1)
             };
+            console.log(`✅ 其他玩家原桌子更新完成`);
+            return updatedTable;
           }
           
           // 处理当前桌子的更新
           if (table.id === data.tableId) {
-            return {
-              ...table,
-              seats: {
-                ...table.seats,
-                [data.seatNumber]: data.userId,
-                // 如果是座位切换，需要释放原座位
-                ...(data.isSeatSwitch && data.oldSeat ? { [data.oldSeat]: null } : {})
-              },
-              currentPlayers: (data.isSeatSwitch || data.isTableSwitch) ? table.currentPlayers : table.currentPlayers + 1
+            console.log(`🔄 处理其他玩家加入当前桌子 ${table.id}`);
+            const newSeats = {
+              ...table.seats,
+              [data.seatNumber]: data.userId,
+              // 如果是座位切换，需要释放原座位
+              ...(data.isSeatSwitch && data.oldSeat ? { [data.oldSeat]: null } : {})
             };
+            
+            const newCurrentPlayers = (data.isSeatSwitch || data.isTableSwitch) ? table.currentPlayers : table.currentPlayers + 1;
+            
+            const updatedTable = {
+              ...table,
+              seats: newSeats,
+              currentPlayers: newCurrentPlayers
+            };
+            
+            console.log(`✅ 其他玩家当前桌子更新完成:`, {
+              新座位: newSeats,
+              新玩家数: newCurrentPlayers
+            });
+            
+            return updatedTable;
           }
           
           return table;
-        })
-      );
+        });
+        console.log('✅ 其他玩家状态更新完成');
+        return newTables;
+      });
     });
 
     // 监听玩家离开桌子
     socketService.on('player_left_table', (data) => {
-      console.log('👤 玩家离开桌子:', data);
-      setTables(prevTables => 
-        prevTables.map(table => 
-          table.id === data.tableId 
-            ? {
-                ...table,
-                seats: {
-                  ...table.seats,
-                  [data.seatNumber]: null
-                },
-                currentPlayers: Math.max(0, table.currentPlayers - 1)
-              }
-            : table
-        )
-      );
+      console.log('=== [player_left_table] 收到玩家离开事件 ===');
+      console.log('📥 事件数据:', data);
+      
+      setTables(prevTables => {
+        console.log('🔄 更新玩家离开状态...');
+        const newTables = prevTables.map(table => {
+          if (table.id === data.tableId) {
+            console.log(`🔄 处理玩家离开桌子 ${table.id} 座位 ${data.seatNumber}`);
+            const updatedTable = {
+              ...table,
+              seats: {
+                ...table.seats,
+                [data.seatNumber]: null
+              },
+              currentPlayers: Math.max(0, table.currentPlayers - 1)
+            };
+            console.log(`✅ 玩家离开更新完成:`, {
+              原座位: table.seats,
+              新座位: updatedTable.seats,
+              原玩家数: table.currentPlayers,
+              新玩家数: updatedTable.currentPlayers
+            });
+            return updatedTable;
+          }
+          return table;
+        });
+        console.log('✅ 玩家离开状态更新完成');
+        return newTables;
+      });
+    });
+
+    console.log('✅ socket事件监听器设置完成');
+
+    // 监听测试连接响应
+    socketService.on('test_connection_response', (data) => {
+      console.log('=== [test_connection_response] 收到后端测试响应 ===');
+      console.log('📥 后端响应:', data);
+      console.log('✅ 前后端socket通信正常');
     });
 
     // 清理监听器
     return () => {
+      console.log('🧹 清理socket事件监听器...');
+      socketService.off('enter_room_success');
+      socketService.off('enter_room_failed');
+      socketService.off('user_entered_room');
       socketService.off('join_table_success');
       socketService.off('join_table_failed');
       socketService.off('player_joined_table');
       socketService.off('player_left_table');
+      socketService.off('test_connection_response');
+      console.log('✅ socket事件监听器清理完成');
     };
   }, []);
 
@@ -391,11 +528,18 @@ const GameHallPage = () => {
     };
 
     initData();
-  }, [gameId]); // 只依赖gameId，避免无限循环
+  }, [gameId, initRooms, initWebSocket]); // 只依赖gameId，避免无限循环
 
   // 处理座位点击
   const handleSeatClick = (tableId, seatNumber) => {
+    console.log('=== [handleSeatClick] 开始处理座位点击 ===');
+    console.log('📥 点击参数:', { tableId, seatNumber });
+    console.log('📥 当前用户信息:', { user: user?.id, isAuthenticated });
+    console.log('📥 当前选中房间:', selectedRoom);
+    console.log('🔧 socket连接状态:', socketService.getConnectionStatus());
+    
     if (!user || !isAuthenticated) {
+      console.log('❌ 用户未登录，跳转到登录页面');
       // 保存当前页面信息，登录后返回
       const currentPath = location.pathname;
       const currentSearch = location.search;
@@ -413,6 +557,7 @@ const GameHallPage = () => {
     }
 
     if (!selectedRoom) {
+      console.log('❌ 未选择房间');
       alert('请先选择房间');
       return;
     }
@@ -420,60 +565,84 @@ const GameHallPage = () => {
     // 找到对应的房间对象
     const room = rooms.find(r => r.id === selectedRoom);
     if (!room) {
+      console.log('❌ 房间不存在:', selectedRoom);
       alert('房间不存在');
       return;
     }
 
-    console.log(`点击桌子 ${tableId} 座位 ${seatNumber}，房间 ${room.room_id}`);
+    console.log(`🔍 找到房间:`, { id: room.id, room_id: room.room_id, name: room.name });
     
     // 检查座位是否已被占用
     const currentTable = tables.find(t => t.id === tableId);
+    console.log(`🔍 当前桌子信息:`, currentTable);
+    
     if (currentTable && currentTable.seats[seatNumber]) {
+      console.log(`❌ 座位 ${seatNumber} 已被用户 ${currentTable.seats[seatNumber]} 占用`);
       alert('该座位已被占用');
       return;
     }
 
-    // 发送加入桌子的请求，包含room_id
-    console.log('🔧 前端发送join_table事件:', {
-      tableId,
-      roomId: room.id, // 使用room.id（数字）
-      seatNumber,
-      userId: user.id,
-      username: user.username,
-    });
-    
-    socketService.emit('join_table', {
-      tableId: parseInt(tableId), // 确保tableId是数字
-      roomId: room.id, // 使用room.id（数字）
-      seatNumber,
-      userId: user.id,
-      username: user.username,
-    });
-
     // 检查用户是否已在其他座位（座位切换）
     const existingSeat = currentTable ? Object.entries(currentTable.seats).find(([seat, userId]) => userId === user.id)?.[0] : null;
     const isSeatSwitch = existingSeat && existingSeat !== seatNumber.toString();
+    const isTableSwitch = false; // 前端无法直接判断跨桌子切换，由后端返回
+    
+    console.log(`🔍 座位切换检查:`, { existingSeat, isSeatSwitch, isTableSwitch });
+
+    // 发送加入桌子的请求，包含room_id和game_id
+    const socketData = {
+      tableId: parseInt(tableId), // 确保tableId是数字
+      roomId: room.id, // 使用room.id（数字）
+      gameId: parseInt(gameId), // 添加gameId
+      seatNumber,
+      userId: user.id,
+      username: user.username,
+    };
+    
+    console.log('🔧 准备发送socket事件:', socketData);
+    console.log('🔧 socket连接状态:', socketService.getConnectionStatus());
+    
+    socketService.emit('join_table', socketData);
+    console.log('✅ socket事件已发送');
 
     // 立即更新本地状态，提供即时反馈
-    setTables(prevTables => 
-      prevTables.map(table => 
-        table.id === tableId 
-          ? {
-              ...table,
-              seats: {
-                ...table.seats,
-                [seatNumber]: user.id,
-                // 如果是座位切换，释放原座位
-                ...(isSeatSwitch && existingSeat ? { [existingSeat]: null } : {})
-              },
-              currentPlayers: isSeatSwitch ? table.currentPlayers : table.currentPlayers + 1
-            }
-          : table
-      )
-    );
+    console.log('🔄 更新本地状态...');
+    setTables(prevTables => {
+      const newTables = prevTables.map(table => {
+        if (table.id === tableId) {
+          const newSeats = {
+            ...table.seats,
+            [seatNumber]: user.id,
+            // 如果是座位切换，释放原座位
+            ...(isSeatSwitch && existingSeat ? { [existingSeat]: null } : {})
+          };
+          
+          const newCurrentPlayers = (isSeatSwitch || isTableSwitch) ? table.currentPlayers : table.currentPlayers + 1;
+          
+          console.log(`🔄 更新桌子 ${tableId}:`, {
+            原座位状态: table.seats,
+            新座位状态: newSeats,
+            原玩家数: table.currentPlayers,
+            新玩家数: newCurrentPlayers
+          });
+          
+          return {
+            ...table,
+            seats: newSeats,
+            currentPlayers: newCurrentPlayers
+          };
+        }
+        return table;
+      });
+      
+      console.log('✅ 本地状态更新完成');
+      return newTables;
+    });
 
     // 显示成功消息
+    console.log(`✅ 本地操作完成，显示成功消息`);
     alert(`成功加入桌子 ${tableId} 座位 ${seatNumber}`);
+    console.log('=== [handleSeatClick] 处理完成 ===');
   };
 
   // 渲染座位按钮
@@ -484,12 +653,43 @@ const GameHallPage = () => {
     const isSeatAvailable = table.availableSeats && table.availableSeats.includes(seatNumber);
     const isDisabled = !isSeatAvailable || isTableFull || isTablePlaying || isOccupied;
     
-    // 座位颜色逻辑：绿色为已占用，紫色为空座位，灰色为禁用
-    let seatColor = 'primary'; // 默认紫色
+    // 添加调试信息
+    console.log(`🔍 渲染座位 ${seatNumber}:`, {
+      tableId: table.id,
+      isOccupied,
+      isTableFull,
+      isTablePlaying,
+      isSeatAvailable,
+      isDisabled,
+      currentPlayers: table.currentPlayers,
+      maxSeat: table.maxSeat,
+      availableSeats: table.availableSeats
+    });
+    
+    // 座位颜色逻辑：
+    // - 蓝色：空座位（可点击）
+    // - 绿色：已占用
+    // - 橙色：游戏中（所有玩家都准备就绪）
+    let seatBgColor = '#1976d2'; // 默认蓝色（空座位）
+    let seatTextColor = 'white';
+    let seatBorderColor = '#1976d2';
+    let seatHoverColor = '#1565c0';
+    
     if (isOccupied) {
-      seatColor = 'success'; // 绿色
+      seatBgColor = '#2e7d32'; // 绿色（已占用）
+      seatTextColor = 'white';
+      seatBorderColor = '#2e7d32';
+      seatHoverColor = '#1b5e20';
+    } else if (isTablePlaying) {
+      seatBgColor = '#ed6c02'; // 橙色（游戏中）
+      seatTextColor = 'white';
+      seatBorderColor = '#ed6c02';
+      seatHoverColor = '#e65100';
     } else if (isDisabled) {
-      seatColor = 'default'; // 灰色 - 使用default而不是disabled
+      seatBgColor = '#e0e0e0'; // 灰色（禁用）
+      seatTextColor = '#757575';
+      seatBorderColor = '#e0e0e0';
+      seatHoverColor = '#e0e0e0';
     }
 
     const positionStyles = {
@@ -518,7 +718,7 @@ const GameHallPage = () => {
     return (
       <Button
         size="small"
-        variant={isOccupied ? 'contained' : 'outlined'}
+        variant={isOccupied || isTablePlaying ? 'contained' : 'outlined'}
         sx={{
           position: 'absolute',
           minWidth: 24,
@@ -527,15 +727,24 @@ const GameHallPage = () => {
           p: 0,
           ...positionStyles[seatNumber],
           opacity: isDisabled ? 0.5 : 1,
-          // 使用sx来设置颜色，避免color属性问题
-          bgcolor: isOccupied ? 'success.main' : isDisabled ? 'grey.300' : 'primary.main',
-          color: isOccupied ? 'white' : isDisabled ? 'grey.500' : 'white',
-          borderColor: isOccupied ? 'success.main' : isDisabled ? 'grey.300' : 'primary.main',
+          // 使用自定义颜色
+          bgcolor: seatBgColor,
+          color: seatTextColor,
+          borderColor: seatBorderColor,
           '&:hover': {
-            bgcolor: isOccupied ? 'success.dark' : isDisabled ? 'grey.300' : 'primary.dark',
+            bgcolor: seatHoverColor,
+            borderColor: seatHoverColor,
+          },
+          '&:disabled': {
+            bgcolor: seatBgColor,
+            color: seatTextColor,
+            borderColor: seatBorderColor,
           }
         }}
-        onClick={() => handleSeatClick(table.id, seatNumber)}
+        onClick={() => {
+          console.log(`🔧 座位 ${seatNumber} 被点击，tableId: ${table.id}`);
+          handleSeatClick(table.id, seatNumber);
+        }}
         disabled={isDisabled}
       >
         {seatNumber}
@@ -665,7 +874,15 @@ const GameHallPage = () => {
         <Grid item xs={12} md={3}>
           <Card sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              房间列表
+              房间列表 (双击进入)
+              {loading && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="caption" color="text.secondary">
+                    加载中...
+                  </Typography>
+                </Box>
+              )}
             </Typography>
             
             <List sx={{ p: 0 }}>
@@ -674,7 +891,8 @@ const GameHallPage = () => {
                   <ListItem disablePadding>
                     <ListItemButton
                       selected={selectedRoom === room.id}
-                      onClick={() => handleRoomSelect(room.id)}
+                      onDoubleClick={() => handleRoomSelect(room.id)}
+                      disabled={loading}
                       sx={{
                         borderRadius: 1,
                         mb: 1,
@@ -685,10 +903,20 @@ const GameHallPage = () => {
                             bgcolor: 'primary.dark',
                           },
                         },
+                        '&:disabled': {
+                          opacity: 0.6,
+                        },
                       }}
                     >
                       <ListItemText
-                        primary={room.name}
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {room.name}
+                            {loading && selectedRoom === room.id && (
+                              <CircularProgress size={12} color="inherit" />
+                            )}
+                          </Box>
+                        }
                         secondary={
                           <React.Fragment>
                             <Typography
@@ -740,6 +968,14 @@ const GameHallPage = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 对战桌面
+                {loading && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="caption" color="text.secondary">
+                      正在加载房间 {selectedRoom} 的桌子数据...
+                    </Typography>
+                  </Box>
+                )}
               </Typography>
               
               <Box sx={{ display: 'flex', gap: 1 }}>
@@ -751,7 +987,7 @@ const GameHallPage = () => {
                     borderRadius: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    bgcolor: 'primary.main',
+                    bgcolor: '#1976d2',
                     color: '#ffffff',
                     display: 'inline-block'
                   }}
@@ -766,7 +1002,7 @@ const GameHallPage = () => {
                     borderRadius: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    bgcolor: 'success.main',
+                    bgcolor: '#2e7d32',
                     color: '#ffffff',
                     display: 'inline-block'
                   }}
@@ -781,7 +1017,7 @@ const GameHallPage = () => {
                     borderRadius: 1,
                     fontSize: '0.875rem',
                     fontWeight: 500,
-                    bgcolor: 'warning.main',
+                    bgcolor: '#ed6c02',
                     color: '#ffffff',
                     display: 'inline-block'
                   }}
@@ -800,9 +1036,31 @@ const GameHallPage = () => {
                 maxHeight: '70vh',
                 overflowY: 'auto',
                 p: 1,
+                position: 'relative',
+                minHeight: '200px'
               }}
             >
-              {tables.map((table) => renderTable(table))}
+              {loading ? (
+                <Box 
+                  sx={{ 
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 2
+                  }}
+                >
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" color="text.secondary">
+                    正在加载桌子数据...
+                  </Typography>
+                </Box>
+              ) : (
+                tables.map((table) => renderTable(table))
+              )}
             </Box>
           </Card>
         </Grid>
@@ -811,7 +1069,7 @@ const GameHallPage = () => {
       {/* 底部信息 */}
       <Box sx={{ textAlign: 'center', mt: 4, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Typography variant="body2" color="text.secondary">
-          点击座位号加入游戏，每个桌子最多支持4名玩家
+          双击房间进入，点击座位号加入游戏，每个桌子最多支持4名玩家
         </Typography>
       </Box>
     </Box>

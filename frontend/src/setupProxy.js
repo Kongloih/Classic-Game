@@ -7,6 +7,9 @@ module.exports = function(app) {
       target: 'http://localhost:5000',
       changeOrigin: true,
       logLevel: 'debug',
+      pathRewrite: {
+        '^/api': '/api' // 显式保留 /api 前缀
+      },
       onError: (err, req, res) => {
         console.error('代理错误:', err);
         res.writeHead(500, {

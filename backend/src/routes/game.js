@@ -4,32 +4,23 @@ const { authMiddleware } = require('../middleware/auth');
 const User = require('../models/User');
 const Game = require('../models/Game');
 
-// 获取游戏列表 (公开访问)
-router.get('/', async (req, res) => {
+// 获取游戏列表 (需要认证)
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const { category, featured, hot, limit = 50 } = req.query;
     const where = { status: 'active' };
-    
     if (category) where.category = category;
     if (featured === 'true') where.is_featured = true;
     if (hot === 'true') where.is_hot = true;
-    
     const games = await Game.findAll({
       where,
       limit: parseInt(limit),
       order: [['createdAt', 'DESC']]
     });
-    
-    res.json({
-      success: true,
-      data: games
-    });
+    res.json({ success: true, data: games });
   } catch (error) {
     console.error('获取游戏列表错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取游戏列表失败'
-    });
+    res.status(500).json({ success: false, message: '获取游戏列表失败' });
   }
 });
 
@@ -189,29 +180,18 @@ router.get('/stats/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// 获取游戏详情 (公开访问) - 移到后面以避免路由冲突
+// 获取游戏详情 (公开访问)
 router.get('/:id', async (req, res) => {
   try {
     const gameId = req.params.id;
-    
     const game = await Game.findByPk(gameId);
     if (!game) {
-      return res.status(404).json({
-        success: false,
-        message: '游戏不存在'
-      });
+      return res.status(404).json({ success: false, message: '游戏不存在' });
     }
-    
-    res.json({
-      success: true,
-      data: game
-    });
+    res.json({ success: true, data: game });
   } catch (error) {
     console.error('获取游戏详情错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取游戏详情失败'
-    });
+    res.status(500).json({ success: false, message: '获取游戏详情失败' });
   }
 });
 

@@ -56,12 +56,13 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
-app.use('/api/games', gameRoutes); // 移除认证要求，让游戏路由自己决定
+app.use('/api/games', authMiddleware, gameRoutes);
 app.use('/api/battle', authMiddleware, battleRoutes);
 app.use('/api/social', authMiddleware, socialRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
+  console.log('未匹配的请求:', req.method, req.path);
   res.status(404).json({
     success: false,
     message: 'API endpoint not found'

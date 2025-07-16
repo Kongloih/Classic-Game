@@ -73,6 +73,19 @@ const socketHandler = (io) => {
     }));
     socket.emit('online_users_list', onlineUsersList);
 
+    // 测试连接事件
+    socket.on('test_connection', (data) => {
+      console.log('=== [test_connection] 收到前端测试连接 ===');
+      console.log('📥 测试数据:', data);
+      console.log('✅ 前端socket连接正常');
+      socket.emit('test_connection_response', { 
+        message: '后端连接正常',
+        timestamp: new Date().toISOString(),
+        userId: socket.userId,
+        username: socket.username
+      });
+    });
+
     // 处理加入游戏房间
     socket.on('join_game_room', async (data) => {
       const { roomId, gameType } = data;
@@ -227,11 +240,78 @@ const socketHandler = (io) => {
       }
     });
 
+    // 处理进入房间
+    socket.on('enter_room', async (data) => {
+      const { roomId, gameId } = data;
+      console.log('=== [enter_room] 开始处理前端请求 ===');
+      console.log('📥 收到前端参数:', { roomId, gameId });
+      console.log('📥 参数类型:', { 
+        roomId: typeof roomId, 
+        gameId: typeof gameId
+      });
+      
+      try {
+        // 导入必要的模型和服务
+        const BattleService = require('../services/battleService');
+        
+        // 确保参数类型正确
+        const parsedRoomId = parseInt(roomId);
+        const parsedGameId = parseInt(gameId);
+        
+        console.log('🔧 解析后的参数:', { parsedRoomId, parsedGameId });
+        
+        // 调用进入房间服务
+        console.log('🔧 调用userEnterRoom服务...');
+        const result = await BattleService.userEnterRoom(socket.userId, parsedRoomId);
+        
+        console.log('✅ userEnterRoom执行成功:', result);
+        
+        // 发送成功响应
+        const successResponse = {
+          roomId: parsedRoomId,
+          gameId: parsedGameId,
+          room: result.room,
+          previousTableInfo: result.previousTableInfo
+        };
+        
+        console.log('📤 发送成功响应:', successResponse);
+        socket.emit('enter_room_success', successResponse);
+        
+        // 广播给其他用户
+        const broadcastData = {
+          roomId: parsedRoomId,
+          userId: socket.userId,
+          username: socket.username,
+          action: 'entered_room'
+        };
+        
+        console.log('📤 广播给其他用户:', broadcastData);
+        socket.broadcast.emit('user_entered_room', broadcastData);
+        
+        console.log('=== [enter_room] 处理完成 ===');
+      } catch (error) {
+        console.error('[enter_room] ❌ 进入房间失败:', error);
+        console.error('[enter_room] ❌ 错误堆栈:', error.stack);
+        socket.emit('enter_room_failed', {
+          roomId: parsedRoomId,
+          message: error.message || '进入房间失败'
+        });
+      }
+    });
+
     // 处理加入桌子
     socket.on('join_table', async (data) => {
-      const { tableId, roomId, seatNumber, userId, username } = data;
-      console.log('--- [join_table] 收到前端请求 ---');
-      console.log('参数:', { tableId, roomId, seatNumber, userId, username });
+      const { tableId, roomId, gameId, seatNumber, userId, username } = data;
+      console.log('=== [join_table] 开始处理前端请求 ===');
+      console.log('📥 收到前端参数:', { tableId, roomId, gameId, seatNumber, userId, username });
+      console.log('📥 参数类型:', { 
+        tableId: typeof tableId, 
+        roomId: typeof roomId, 
+        gameId: typeof gameId,
+        seatNumber: typeof seatNumber, 
+        userId: typeof userId 
+      });
+      
       try {
         // 导入必要的模型和服务
         const BattleTable = require('../models/BattleTable');
@@ -240,19 +320,33 @@ const socketHandler = (io) => {
         // 确保参数类型正确
         const parsedTableId = parseInt(tableId);
         const parsedRoomId = parseInt(roomId);
+        const parsedGameId = parseInt(gameId);
         const parsedSeatNumber = parseInt(seatNumber);
         
-        console.log('🔧 解析后的参数:', { parsedTableId, parsedRoomId, parsedSeatNumber });
+        console.log('🔧 解析后的参数:', { parsedTableId, parsedRoomId, parsedGameId, parsedSeatNumber });
+        console.log('🔧 解析参数类型:', { 
+          parsedTableId: typeof parsedTableId, 
+          parsedRoomId: typeof parsedRoomId, 
+          parsedGameId: typeof parsedGameId,
+          parsedSeatNumber: typeof parsedSeatNumber 
+        });
         
-        // 查找桌子，使用table_id字段查找
-        // 首先尝试通过主键ID查找房间
-        let room = await BattleRoom.findByPk(parsedRoomId);
+        // 查找房间 - 使用roomId和gameId共同查找
+        console.log('🔍 开始查找房间...');
+        console.log(`🔍 查找条件: room_id = ${parsedRoomId}, game_id = ${parsedGameId}`);
+        let room = await BattleRoom.findOne({
+          where: { 
+            room_id: parsedRoomId,
+            game_id: parsedGameId
+          }
+        });
+        console.log('🔍 通过room_id和game_id查找房间结果:', room ? `找到房间 ${room.name} (ID: ${room.id})` : '未找到');
         
-        // 如果找不到，尝试通过room_id字段查找
+        // 如果找不到，尝试通过主键ID查找（兼容性）
         if (!room) {
-          room = await BattleRoom.findOne({
-            where: { room_id: parsedRoomId }
-          });
+          console.log('🔍 尝试通过主键ID查找房间...');
+          room = await BattleRoom.findByPk(parsedRoomId);
+          console.log('🔍 通过主键查找房间结果:', room ? `找到房间 ${room.name} (ID: ${room.id})` : '未找到');
         }
         
         if (!room) {
@@ -268,12 +362,14 @@ const socketHandler = (io) => {
         console.log(`[join_table] ✅ 找到房间: ${room.name} (ID: ${room.id}, room_id: ${room.room_id})`);
         
         // 使用房间的主键ID查找桌子
+        console.log('🔍 开始查找桌子...');
         const table = await BattleTable.findOne({
           where: { 
-            table_id: parsedTableId,
+            table_id: `table_${parsedTableId}`, // 转换为正确的字符串格式
             room_id: room.id  // 使用房间的主键ID
           }
         });
+        
         if (!table) {
           console.log(`[join_table] ❌ 桌子 ${parsedTableId} 在房间 ${parsedRoomId} 中不存在`);
           socket.emit('join_table_failed', {
@@ -283,12 +379,23 @@ const socketHandler = (io) => {
           });
           return;
         }
-        console.log(`[join_table] ✅ 找到桌子:`, table.toJSON());
+        
+        console.log(`[join_table] ✅ 找到桌子:`, {
+          id: table.id,
+          table_id: table.table_id,
+          room_id: table.room_id,
+          current_players: table.current_players,
+          status: table.status
+        });
+        
         // 检查座位是否已被占用
         const seatField = `seat_${parsedSeatNumber}_user_id`;
-        console.log(`[join_table] 检查座位字段:`, seatField, '当前值:', table[seatField]);
-        if (table[seatField]) {
-          console.log(`[join_table] ❌ 座位 ${parsedSeatNumber} 已被占用，当前用户ID: ${table[seatField]}`);
+        console.log(`[join_table] 🔍 检查座位字段: ${seatField}`);
+        console.log(`[join_table] 🔍 座位当前值: ${table[seatField]}`);
+        console.log(`[join_table] 🔍 当前用户ID: ${userId}`);
+        
+        if (table[seatField] && table[seatField] !== userId) {
+          console.log(`[join_table] ❌ 座位 ${parsedSeatNumber} 已被其他用户占用，当前用户ID: ${table[seatField]}`);
           socket.emit('join_table_failed', {
             tableId: parsedTableId,
             seatNumber: parsedSeatNumber,
@@ -296,25 +403,29 @@ const socketHandler = (io) => {
           });
           return;
         }
-        // 检查用户是否已在其他座位（现在支持座位切换，所以只记录日志）
+        
+        // 检查用户是否已在其他座位
+        console.log('🔍 检查用户是否已在其他座位...');
         const existingSeat = await BattleService.getUserSeat(userId, table.id);
-        console.log(`[join_table] 用户是否已在其他座位:`, existingSeat);
+        console.log(`[join_table] 🔍 用户当前座位检查结果:`, existingSeat);
+        
         if (existingSeat && existingSeat === parsedSeatNumber) {
-          console.log(`[join_table] ❌ 用户已在该座位 ${existingSeat}`);
-          socket.emit('join_table_failed', {
-            tableId: parsedTableId,
-            seatNumber: parsedSeatNumber,
-            message: '您已在该座位'
-          });
-          return;
+          console.log(`[join_table] ✅ 用户已在该座位 ${existingSeat}，允许刷新状态`);
+          // 用户点击的是自己当前所在的座位，允许刷新状态
+        } else if (existingSeat && existingSeat !== parsedSeatNumber) {
+          console.log(`[join_table] 🔄 用户从座位 ${existingSeat} 切换到座位 ${parsedSeatNumber}（同一张桌子）`);
+          // 用户在同一张桌子内切换座位，这是允许的
         }
+        
         // 加入座位
-        console.log(`[join_table] 调用userJoinTable...`);
+        console.log(`[join_table] 🔧 调用userJoinTable...`);
+        console.log(`[join_table] 🔧 userJoinTable参数:`, { userId, tableId: table.id, seatNumber: parsedSeatNumber });
+        
         const result = await BattleService.userJoinTable(userId, table.id, parsedSeatNumber);
         console.log(`[join_table] ✅ userJoinTable结果:`, result);
         
         // 发送成功响应
-        socket.emit('join_table_success', {
+        const successResponse = {
           tableId: parsedTableId,
           seatNumber: parsedSeatNumber,
           userId,
@@ -323,10 +434,13 @@ const socketHandler = (io) => {
           isTableSwitch: result.isTableSwitch,
           oldSeat: result.oldSeat,
           oldTableInfo: result.oldTableInfo
-        });
+        };
+        
+        console.log(`[join_table] 📤 发送成功响应:`, successResponse);
+        socket.emit('join_table_success', successResponse);
         
         // 广播给其他用户
-        socket.broadcast.emit('player_joined_table', {
+        const broadcastData = {
           tableId: parsedTableId,
           seatNumber: parsedSeatNumber,
           userId,
@@ -335,19 +449,27 @@ const socketHandler = (io) => {
           isTableSwitch: result.isTableSwitch,
           oldSeat: result.oldSeat,
           oldTableInfo: result.oldTableInfo
-        });
+        };
+        
+        console.log(`[join_table] 📤 广播给其他用户:`, broadcastData);
+        socket.broadcast.emit('player_joined_table', broadcastData);
 
         // 如果是跨桌子切换，广播离开原桌子的事件
         if (result.isTableSwitch && result.oldTableInfo) {
-          socket.broadcast.emit('player_left_table', {
+          const leaveData = {
             tableId: result.oldTableInfo.tableId,
             seatNumber: result.oldTableInfo.seatNumber,
             userId,
             username
-          });
+          };
+          console.log(`[join_table] 📤 广播跨桌子切换离开事件:`, leaveData);
+          socket.broadcast.emit('player_left_table', leaveData);
         }
+        
+        console.log('=== [join_table] 处理完成 ===');
       } catch (error) {
         console.error('[join_table] ❌ 加入桌子失败:', error);
+        console.error('[join_table] ❌ 错误堆栈:', error.stack);
         socket.emit('join_table_failed', {
           tableId: parsedTableId,
           seatNumber: parsedSeatNumber,
