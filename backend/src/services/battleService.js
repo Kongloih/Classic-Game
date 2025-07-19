@@ -667,12 +667,12 @@ class BattleService {
       // 6. 返回正确的桌子信息
       if (correctTable && correctSeatNumber) {
         console.log(`✅ 最终确定用户 ${userId} 在桌子 ${correctTable.id} (table_id: ${correctTable.table_id}) 座位 ${correctSeatNumber}`);
-        return {
+          return {
           tableId: correctTable.id,
           seatNumber: correctSeatNumber,
           roomId: correctTable.room_id,
           tableTableId: correctTable.table_id
-        };
+          };
       }
       
       console.log(`❌ 无法确定用户 ${userId} 的正确座位`);

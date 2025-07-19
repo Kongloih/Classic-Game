@@ -18,6 +18,8 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 
 import './styles/index.css';
 
+// const setupProxy = require('./setupProxy');
+
 // 创建 React Query 客户端
 const queryClient = new QueryClient({
   defaultOptions: {

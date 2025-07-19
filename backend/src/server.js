@@ -1,4 +1,12 @@
+// API Routes
+console.log('===============Server=======================');
+console.log('===============Server=======================');
+
+
+
+
 const express = require('express');
+const app = express();
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
@@ -7,6 +15,14 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+// 在所有路由之前添加
+app.use((req, res, next) => {
+  console.log('*********************************************************');
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  console.log('*********************************************************');
+  next();
+});
 
 // 设置默认环境变量（如果没有.env文件）
 if (!process.env.JWT_SECRET) {
@@ -32,12 +48,12 @@ if (!process.env.CORS_ORIGIN) {
 }
 
 // // 导入路由和中间件
-// const authRoutes = require('./routes/auth');
-// const userRoutes = require('./routes/user');
-// const gameRoutes = require('./routes/game');
-// const socialRoutes = require('./routes/social');
-// const battleRoutes = require('./routes/battle');
-// const gameHallRoutes = require('./routes/gameHall');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+const gameRoutes = require('./routes/game');
+const socialRoutes = require('./routes/social');
+const battleRoutes = require('./routes/battle');
+const gameHallRoutes = require('./routes/gameHall');
 
 // 导入Socket.IO处理器
 const socketHandler = require('./socket/socketHandler');
@@ -53,7 +69,7 @@ const CleanupService = require('./services/cleanupService');
 const { errorHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
 
-const app = express();
+// const app = express();
 const server = http.createServer(app);
 
 // Socket.IO配置
@@ -137,12 +153,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // // API路由
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/games', gameRoutes);
-// app.use('/api/social', socialRoutes);
-// app.use('/api/battles', battleRoutes);
-// app.use('/api/games/hall', gameHallRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/battles', battleRoutes);
+app.use('/api/games/hall', gameHallRoutes);
 
 // API文档
 if (process.env.NODE_ENV !== 'production') {
@@ -153,14 +169,14 @@ if (process.env.NODE_ENV !== 'production') {
   console.log('📚 API文档可在 http://localhost:5000/api-docs 查看');
 }
 
-// 404处理
-app.use('*', (req, res) => {
-  console.log('未匹配的请求:', req.method, req.path);
-  res.status(404).json({
-    success: false,
-    message: '请求的资源不存在'
-  });
-});
+// // 404处理
+// app.use('*', (req, res) => {
+//   console.log('未匹配的请求:', req.method, req.path);
+//   res.status(404).json({
+//     success: false,
+//     message: '请求的资源不存在'
+//   });
+// });
 
 // 错误处理中间件
 app.use(errorHandler);

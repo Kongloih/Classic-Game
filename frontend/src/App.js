@@ -72,22 +72,32 @@ function App() {
       dispatch(initializeSocket());
       
       // 监听连接状态
-      socketService.on('connect', () => {
+      const handleConnect = () => {
         console.log('✅ Socket连接成功');
-      });
+      };
 
-      socketService.on('disconnect', (reason) => {
+      const handleDisconnect = (reason) => {
         console.log('🔌 Socket连接断开:', reason);
         if (reason === 'io server disconnect') {
           // 服务器主动断开，尝试重连
           socketService.connect();
         }
-      });
+      };
 
-      socketService.on('auth_error', () => {
+      const handleAuthError = () => {
         console.error('❌ Socket认证失败，清除用户状态');
         dispatch(clearUser());
-      });
+      };
+
+      socketService.on('connect', handleConnect);
+      socketService.on('disconnect', handleDisconnect);
+      socketService.on('auth_error', handleAuthError);
+
+      return () => {
+        socketService.off('connect', handleConnect);
+        socketService.off('disconnect', handleDisconnect);
+        socketService.off('auth_error', handleAuthError);
+      }
 
     } else {
       // 用户未登录，断开Socket连接
@@ -259,4 +269,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

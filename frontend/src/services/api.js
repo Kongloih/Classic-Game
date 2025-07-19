@@ -1,5 +1,12 @@
 import axios from 'axios';
 
+console.log('[API] api.js模块已被加载');
+console.log('[API] api.js模块已被加载');
+console.log('[API] api.js模块已被加载');
+console.log('[API] api.js模块已被加载');
+console.log('[API] api.js模块已被加载');
+console.log('[API] api.js模块已被加载');
+
 // 创建axios实例
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api',
@@ -9,6 +16,14 @@ const api = axios.create({
 // 请求拦截器 - 添加认证token
 api.interceptors.request.use(
   (config) => {
+    console.log(
+      `[Request] ${new Date().toISOString()} | ${config.method?.toUpperCase()} ${config.url}`
+    );
+    console.debug('Request Config:', {
+      params: config.params,
+      data: config.data
+    });
+
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -16,6 +31,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('[Request Interceptor Error]', error);
     return Promise.reject(error);
   }
 );
@@ -23,11 +39,26 @@ api.interceptors.request.use(
 // 响应拦截器 - 处理错误
 api.interceptors.response.use(
   (response) => {
+    console.log(
+      `[Response] ${new Date().toISOString()} | ${response.config.method?.toUpperCase()} ${response.config.url} | Status ${response.status}`
+    );
+    console.debug('Response Data:', response.data);
     return response.data;
   },
   (error) => {
+    const { config, response } = error;
+    const errorMessage = response?.data?.message || error.message;
+    
+    console.error(
+      `[API Error] ${config?.method?.toUpperCase()} ${config?.url} | Status ${response?.status || 'N/A'}`
+    );
+    console.error('Error Details:', {
+      message: errorMessage,
+      config: error.config
+    });
+
     if (error.response?.status === 401) {
-      // 清除token并重定向到登录页
+      console.warn('[Auth] Token expired or invalid, redirecting to login');
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -35,48 +66,62 @@ api.interceptors.response.use(
   }
 );
 
-// 游戏相关API
+// 游戏相关API（添加函数调用日志）
 export const gameApi = {
-  // 获取游戏大厅数据
   getGameHall: (gameId, testMode = false) => {
-    const params = {};
-    if (testMode) {
-      params.testMode = 'true';
-    }
+    console.log(`[API] getGameHall(gameId=${gameId}, testMode=${testMode})`);
+    const params = testMode ? { testMode: 'true' } : {};
     return api.get(`/games/hall/${gameId}`, { params });
   },
   
-  // 获取在线用户列表
-  getOnlineUsers: (limit = 20) => api.get('/games/online-users', { params: { limit } }),
+  getOnlineUsers: (limit = 20) => {
+    console.log(`[API] getOnlineUsers(limit=${limit})`);
+    return api.get('/games/online-users', { params: { limit } });
+  },
   
-  // 获取用户游戏统计
-  getUserStats: (userId) => api.get(`/games/stats/${userId}`),
+  getUserStats: (userId) => {
+    console.log(`[API] getUserStats(userId=${userId})`);
+    return api.get(`/games/stats/${userId}`);
+  },
   
-  // 获取游戏列表
-  getGames: (params) => api.get('/games', { params }),
+  getGames: (params) => {
+    console.log(`[API] getGames(${JSON.stringify(params)})`);
+    return api.get('/games', { params });
+  },
   
-  // 获取游戏详情
-  getGame: (gameId) => api.get(`/games/${gameId}`),
+  getGame: (gameId) => {
+    console.log(`[API] getGame(gameId=${gameId})`);
+    return api.get(`/games/${gameId}`);
+  },
 };
 
-// 认证相关API
+// 认证相关API（添加函数调用日志）
 export const authApi = {
-  // 用户注册
-  register: (userData) => api.post('/auth/register', userData),
+  register: (userData) => {
+    console.log(`[API] register(userData=${JSON.stringify(userData)})`);
+    return api.post('/auth/register', userData);
+  },
   
-  // 用户登录
-  login: (loginData) => api.post('/auth/login', loginData),
+  login: (loginData) => {
+    console.log(`[API] login(loginData=${JSON.stringify(loginData)})`);
+    return api.post('/auth/login', loginData);
+  },
   
-  // 发送短信验证码
-  sendSms: (smsData) => api.post('/auth/send-sms', smsData),
+  sendSms: (smsData) => {
+    console.log(`[API] sendSms(smsData=${JSON.stringify(smsData)})`);
+    return api.post('/auth/send-sms', smsData);
+  },
   
-  // 获取认证状态
-  getAuthStatus: () => api.get('/auth/status'),
+  getAuthStatus: () => {
+    console.log(`[API] getAuthStatus()`);
+    return api.get('/auth/status');
+  },
   
-  // 用户登出
-  logout: () => api.post('/auth/logout'),
+  logout: () => {
+    console.log(`[API] logout()`);
+    return api.post('/auth/logout');
+  },
 };
-
 // 用户相关API
 export const userApi = {
   // 获取用户信息

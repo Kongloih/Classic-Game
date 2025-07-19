@@ -190,7 +190,7 @@ const GameHallPage = () => {
       console.log('🔧 跳过Socket事件发送（测试模式）...');
       
       // 注释掉原来的Socket事件发送代码
-      /*
+      
       // 发送进入房间事件
       console.log('🔧 发送进入房间socket事件...');
       const socketData = {
@@ -203,7 +203,7 @@ const GameHallPage = () => {
       
       socketService.emit('enter_room', socketData);
       console.log('✅ 进入房间事件已发送');
-      */
+    
       
       // 从API获取该房间的桌子数据
       await loadRoomTables(roomId);
@@ -224,7 +224,8 @@ const GameHallPage = () => {
         throw new Error('用户未登录，请先登录');
       }
       // 调用后端API获取房间列表
-      const response = await fetch(`/api/battles/rooms/${gameId}`, {
+      // const response = await fetch(`/api/battles/rooms/${gameId}`, {
+      const response = await fetch(`/api/battles/rooms/1`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -653,18 +654,18 @@ const GameHallPage = () => {
     const isSeatAvailable = table.availableSeats && table.availableSeats.includes(seatNumber);
     const isDisabled = !isSeatAvailable || isTableFull || isTablePlaying || isOccupied;
     
-    // 添加调试信息
-    console.log(`🔍 渲染座位 ${seatNumber}:`, {
-      tableId: table.id,
-      isOccupied,
-      isTableFull,
-      isTablePlaying,
-      isSeatAvailable,
-      isDisabled,
-      currentPlayers: table.currentPlayers,
-      maxSeat: table.maxSeat,
-      availableSeats: table.availableSeats
-    });
+    // // 添加调试信息
+    // console.log(`🔍 渲染座位 ${seatNumber}:`, {
+    //   tableId: table.id,
+    //   isOccupied,
+    //   isTableFull,
+    //   isTablePlaying,
+    //   isSeatAvailable,
+    //   isDisabled,
+    //   currentPlayers: table.currentPlayers,
+    //   maxSeat: table.maxSeat,
+    //   availableSeats: table.availableSeats
+    // });
     
     // 座位颜色逻辑：
     // - 蓝色：空座位（可点击）
